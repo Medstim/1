@@ -1,5 +1,5 @@
 -- ============================================================
--- External Functions Module
+-- Services & Dependencies
 -- ============================================================
 local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -9,24 +9,32 @@ local TeleportService  = game:GetService("TeleportService")
 
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
-local Functions = {}
+-- Global Connections Storage
+getgenv().InfiniteJumpConnection = nil
+getgenv().NoclipConnection       = nil
+getgenv().WalkSpeedConnection   = nil
 
--- Connections Storage for Toggles
-local InfiniteJumpConnection = nil
-local NoclipConnection = nil
-local WalkSpeedConnection = nil
+-- ============================================================
+-- Background Handlers
+-- ============================================================
 
--- Anti-AFK Handler
+-- Anti-AFK Handler (Automatic)
 LocalPlayer.Idled:Connect(function()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new(0, 0))
+    if getgenv().AntiAFK ~= false then
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new(0, 0))
+    end
 end)
 
+-- ============================================================
+-- Global Functions
+-- ============================================================
+
 -- WalkSpeed Enforcer
-function Functions.EnableWalkSpeed(speed)
-    if WalkSpeedConnection then
-        WalkSpeedConnection:Disconnect()
-        WalkSpeedConnection = nil
+getgenv().EnableWalkSpeed = function(speed)
+    if getgenv().WalkSpeedConnection then
+        getgenv().WalkSpeedConnection:Disconnect()
+        getgenv().WalkSpeedConnection = nil
     end
 
     local function Attach(char)
@@ -34,7 +42,7 @@ function Functions.EnableWalkSpeed(speed)
         if not humanoid then return end
 
         humanoid.WalkSpeed = speed
-        WalkSpeedConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        getgenv().WalkSpeedConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
             if humanoid.WalkSpeed ~= speed then
                 humanoid.WalkSpeed = speed
             end
@@ -46,14 +54,14 @@ function Functions.EnableWalkSpeed(speed)
 end
 
 -- Infinite Jump Handler
-function Functions.EnableInfiniteJump(enabled)
-    if InfiniteJumpConnection then
-        InfiniteJumpConnection:Disconnect()
-        InfiniteJumpConnection = nil
+getgenv().EnableInfiniteJump = function(enabled)
+    if getgenv().InfiniteJumpConnection then
+        getgenv().InfiniteJumpConnection:Disconnect()
+        getgenv().InfiniteJumpConnection = nil
     end
 
     if enabled then
-        InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
+        getgenv().InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
             if LocalPlayer.Character then
                 local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
                 if humanoid then
@@ -65,14 +73,14 @@ function Functions.EnableInfiniteJump(enabled)
 end
 
 -- Noclip Loop
-function Functions.RunNoclip(enabled)
-    if NoclipConnection then
-        NoclipConnection:Disconnect()
-        NoclipConnection = nil
+getgenv().RunNoclip = function(enabled)
+    if getgenv().NoclipConnection then
+        getgenv().NoclipConnection:Disconnect()
+        getgenv().NoclipConnection = nil
     end
 
     if enabled then
-        NoclipConnection = RunService.Stepped:Connect(function()
+        getgenv().NoclipConnection = RunService.Stepped:Connect(function()
             if LocalPlayer.Character then
                 for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
                     if part:IsA("BasePart") and part.CanCollide then
@@ -85,25 +93,23 @@ function Functions.RunNoclip(enabled)
 end
 
 -- Field of View Changer
-function Functions.SetFOV(fovValue)
+getgenv().SetFOV = function(fovValue)
     workspace.CurrentCamera.FieldOfView = fovValue
 end
 
 -- 3D Rendering Toggle
-function Functions.Set3dRendering(enabled)
+getgenv().Set3dRendering = function(enabled)
     RunService:Set3dRenderingEnabled(enabled)
 end
 
 -- Rejoin Server Function
-function Functions.RejoinServer()
+getgenv().RejoinServer = function()
     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
 end
 
 -- Copy Job ID Function
-function Functions.CopyJobID()
+getgenv().CopyJobID = function()
     if setclipboard then
         setclipboard(game.JobId)
     end
 end
-
-return Functions
