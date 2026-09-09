@@ -1,3 +1,21 @@
+-- ============================================================
+-- External Functions Module
+-- ============================================================
+local Players          = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService       = game:GetService("RunService")
+local VirtualUser      = game:GetService("VirtualUser")
+local TeleportService  = game:GetService("TeleportService")
+
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+
+local Functions = {}
+
+-- Connections Storage for Toggles
+local InfiniteJumpConnection = nil
+local NoclipConnection = nil
+local WalkSpeedConnection = nil
+
 -- Anti-AFK Handler
 LocalPlayer.Idled:Connect(function()
     VirtualUser:CaptureController()
@@ -5,17 +23,22 @@ LocalPlayer.Idled:Connect(function()
 end)
 
 -- WalkSpeed Enforcer
-local function EnableWalkSpeed(speed)
+function Functions.EnableWalkSpeed(speed)
+    if WalkSpeedConnection then
+        WalkSpeedConnection:Disconnect()
+        WalkSpeedConnection = nil
+    end
+
     local function Attach(char)
         local humanoid = char:WaitForChild("Humanoid", 5)
         if not humanoid then return end
 
-        humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        humanoid.WalkSpeed = speed
+        WalkSpeedConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
             if humanoid.WalkSpeed ~= speed then
                 humanoid.WalkSpeed = speed
             end
         end)
-        humanoid.WalkSpeed = speed
     end
 
     if LocalPlayer.Character then task.spawn(Attach, LocalPlayer.Character) end
@@ -23,48 +46,64 @@ local function EnableWalkSpeed(speed)
 end
 
 -- Infinite Jump Handler
-local function EnableInfiniteJump()
-    return UserInputService.JumpRequest:Connect(function()
-        if LocalPlayer.Character then
-            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+function Functions.EnableInfiniteJump(enabled)
+    if InfiniteJumpConnection then
+        InfiniteJumpConnection:Disconnect()
+        InfiniteJumpConnection = nil
+    end
+
+    if enabled then
+        InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
+            if LocalPlayer.Character then
+                local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
             end
-        end
-    end)
+        end)
+    end
 end
 
 -- Noclip Loop
-local function RunNoclip()
-    return RunService.Stepped:Connect(function()
-        if LocalPlayer.Character then
-            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
+function Functions.RunNoclip(enabled)
+    if NoclipConnection then
+        NoclipConnection:Disconnect()
+        NoclipConnection = nil
+    end
+
+    if enabled then
+        NoclipConnection = RunService.Stepped:Connect(function()
+            if LocalPlayer.Character then
+                for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA("BasePart") and part.CanCollide then
+                        part.CanCollide = false
+                    end
                 end
             end
-        end
-    end)
+        end)
+    end
 end
 
 -- Field of View Changer
-local function SetFOV(fovValue)
+function Functions.SetFOV(fovValue)
     workspace.CurrentCamera.FieldOfView = fovValue
 end
 
 -- 3D Rendering Toggle
-local function Set3dRendering(enabled)
+function Functions.Set3dRendering(enabled)
     RunService:Set3dRenderingEnabled(enabled)
 end
 
 -- Rejoin Server Function
-local function RejoinServer()
-    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+function Functions.RejoinServer()
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
 end
 
 -- Copy Job ID Function
-local function CopyJobID()
+function Functions.CopyJobID()
     if setclipboard then
         setclipboard(game.JobId)
     end
 end
+
+return Functions
