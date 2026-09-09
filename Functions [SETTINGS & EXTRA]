@@ -113,3 +113,17 @@ getgenv().CopyJobID = function()
         setclipboard(game.JobId)
     end
 end
+
+-- Copy Game ID Function
+getgenv().CopyGameID = function()
+    if setclipboard then
+        setclipboard(game.GameId)
+    end
+end
+
+-- Copy  Place ID Function
+getgenv().CopyPlaceID = function()
+    if setclipboard then
+        setclipboard(game.PlaceId)
+    end
+end
