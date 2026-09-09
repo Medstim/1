@@ -1,1 +1,70 @@
+-- Anti-AFK Handler
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new(0, 0))
+end)
 
+-- WalkSpeed Enforcer
+local function EnableWalkSpeed(speed)
+    local function Attach(char)
+        local humanoid = char:WaitForChild("Humanoid", 5)
+        if not humanoid then return end
+
+        humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if humanoid.WalkSpeed ~= speed then
+                humanoid.WalkSpeed = speed
+            end
+        end)
+        humanoid.WalkSpeed = speed
+    end
+
+    if LocalPlayer.Character then task.spawn(Attach, LocalPlayer.Character) end
+    LocalPlayer.CharacterAdded:Connect(Attach)
+end
+
+-- Infinite Jump Handler
+local function EnableInfiniteJump()
+    return UserInputService.JumpRequest:Connect(function()
+        if LocalPlayer.Character then
+            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end)
+end
+
+-- Noclip Loop
+local function RunNoclip()
+    return RunService.Stepped:Connect(function()
+        if LocalPlayer.Character then
+            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+end
+
+-- Field of View Changer
+local function SetFOV(fovValue)
+    workspace.CurrentCamera.FieldOfView = fovValue
+end
+
+-- 3D Rendering Toggle
+local function Set3dRendering(enabled)
+    RunService:Set3dRenderingEnabled(enabled)
+end
+
+-- Rejoin Server Function
+local function RejoinServer()
+    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+end
+
+-- Copy Job ID Function
+local function CopyJobID()
+    if setclipboard then
+        setclipboard(game.JobId)
+    end
+end
