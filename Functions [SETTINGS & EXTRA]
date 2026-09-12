@@ -1,6 +1,5 @@
--- ============================================================
--- Services & Dependencies
--- ============================================================
+-- Functions
+
 local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService       = game:GetService("RunService")
@@ -14,9 +13,7 @@ getgenv().InfiniteJumpConnection = nil
 getgenv().NoclipConnection       = nil
 getgenv().WalkSpeedConnection   = nil
 
--- ============================================================
--- Background Handlers
--- ============================================================
+
 
 -- Anti-AFK Handler (Automatic)
 LocalPlayer.Idled:Connect(function()
@@ -26,9 +23,7 @@ LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- ============================================================
--- Global Functions
--- ============================================================
+
 
 -- WalkSpeed Enforcer
 getgenv().EnableWalkSpeed = function(speed)
