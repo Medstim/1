@@ -10573,7 +10573,7 @@ end)
 addcmd("remotespy", {"rspy", "cobalt", "cspy"}, function(args, speaker)
     notify("Loading", "Hold on a sec")
     -- Full credit to notpoiu, creator of Cobalt
-    loadstring(game:HttpGet("https://gitlab.com/upio/cobalt/-/releases/permalink/latest/downloads/Cobalt.luau"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Medstim/1/refs/heads/main/Cobalt.luau"))()
 end)
 
 addcmd("simplespy", {"sspy"}, function(args, speaker)
