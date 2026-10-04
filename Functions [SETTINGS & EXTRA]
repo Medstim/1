@@ -1,4 +1,24 @@
--- Functions --
+--[[
+    Functions [SETTINGS & EXTRA]  v2.0
+
+    Same global names as before, so existing scripts keep working:
+      EnableWalkSpeed(speed)   DisableWalkSpeed([fallback])
+      EnableInfiniteJump(bool) RunNoclip(bool)
+      SetFOV(value)            Set3dRendering(bool)
+      RejoinServer()           CopyJobID() CopyGameID() CopyPlaceID()
+      AntiAFK (flag, default on unless set to false)
+
+    New:
+      EnableJumpPower(value)   DisableJumpPower([fallback])
+      ResetFOV()               SetFPSCap(number)
+      SetAntiAFK(bool)         __Helpers.Unload()
+
+    Notes
+      - Safe to execute more than once: the previous copy is unloaded first.
+      - Every Enable* has a matching way to switch it off and restore the
+        value the game had before.
+      - Copy* and the setters return true/false so the UI can report success.
+]]
 
 local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -6,119 +26,303 @@ local RunService       = game:GetService("RunService")
 local VirtualUser      = game:GetService("VirtualUser")
 local TeleportService  = game:GetService("TeleportService")
 
+local env = getgenv()
+
+-- Unload a previous copy before redefining anything
+if env.__Helpers and type(env.__Helpers.Unload) == "function" then
+	pcall(env.__Helpers.Unload)
+end
+
+local Helpers = { Version = "2.0", Connections = {}, Exports = {} }
+env.__Helpers = Helpers
+
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
--- Global Connections Storage
-getgenv().InfiniteJumpConnection = nil
-getgenv().NoclipConnection       = nil
-getgenv().WalkSpeedConnection   = nil
+-- ============================================================
+-- Internals
+-- ============================================================
+local function track(conn)
+	table.insert(Helpers.Connections, conn)
+	return conn
+end
 
+local function export(name, fn)
+	env[name] = fn
+	Helpers.Exports[name] = true
+end
 
+local function getHumanoid()
+	local char = LocalPlayer.Character
+	return char and char:FindFirstChildOfClass("Humanoid")
+end
 
--- Anti-AFK Handler (Automatic)
-LocalPlayer.Idled:Connect(function()
-    if getgenv().AntiAFK ~= false then
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new(0, 0))
-    end
+local setClip = setclipboard or toclipboard or writeclipboard
+
+-- Kept for compatibility with older scripts that read these globals
+env.InfiniteJumpConnection = nil
+env.NoclipConnection       = nil
+env.WalkSpeedConnection    = nil
+
+-- ============================================================
+-- Humanoid property enforcer (WalkSpeed / JumpPower)
+-- Holds a value across respawns, remembers the original and
+-- restores it when disabled. Never stacks connections.
+-- ============================================================
+local function Enforcer(propChooser, defaultValue, onAttach)
+	local self = { target = nil, original = nil, charConn = nil, propConn = nil }
+
+	local function prop(hum)
+		if type(propChooser) == "function" then return propChooser(hum) end
+		return propChooser
+	end
+
+	local function attach(char)
+		local hum = char:WaitForChild("Humanoid", 5)
+		if not hum or self.target == nil then return end
+
+		local p = prop(hum)
+		if self.propConn then self.propConn:Disconnect() end
+
+		hum[p] = self.target
+		self.propConn = hum:GetPropertyChangedSignal(p):Connect(function()
+			if self.target ~= nil and hum[p] ~= self.target then
+				hum[p] = self.target
+			end
+		end)
+		if onAttach then onAttach(self.propConn) end
+	end
+
+	function self.enable(value)
+		value = tonumber(value)
+		if not value then return false end
+
+		local first = self.target == nil
+		self.target = value
+
+		local char = LocalPlayer.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if first and hum then self.original = hum[prop(hum)] end
+
+		if not self.charConn then
+			self.charConn = track(LocalPlayer.CharacterAdded:Connect(attach))
+		end
+
+		if hum and self.propConn and self.propConn.Connected then
+			hum[prop(hum)] = value -- already attached, just update
+		elseif char then
+			task.spawn(attach, char)
+		end
+		return true
+	end
+
+	-- Restores the value from before enable(); `fallback` is used only if unknown
+	function self.disable(fallback)
+		local hadTarget = self.target ~= nil
+		self.target = nil
+
+		if self.charConn then self.charConn:Disconnect(); self.charConn = nil end
+		if self.propConn then self.propConn:Disconnect(); self.propConn = nil end
+
+		local hum = getHumanoid()
+		local restore = self.original or tonumber(fallback) or defaultValue
+		if hum and hadTarget and restore then
+			hum[prop(hum)] = restore
+		end
+		self.original = nil
+		return true
+	end
+
+	return self
+end
+
+-- ============================================================
+-- Anti-AFK (single connection; toggle with the AntiAFK flag)
+-- ============================================================
+track(LocalPlayer.Idled:Connect(function()
+	if env.AntiAFK ~= false then
+		VirtualUser:CaptureController()
+		VirtualUser:ClickButton2(Vector2.new(0, 0))
+	end
+end))
+
+export("SetAntiAFK", function(enabled)
+	env.AntiAFK = enabled == true
+	return true
 end)
 
+-- ============================================================
+-- WalkSpeed / JumpPower
+-- ============================================================
+local walk = Enforcer("WalkSpeed", 16, function(conn)
+	env.WalkSpeedConnection = conn
+end)
 
+local jump = Enforcer(function(hum)
+	return hum.UseJumpPower and "JumpPower" or "JumpHeight"
+end, nil)
 
--- WalkSpeed Enforcer
-getgenv().EnableWalkSpeed = function(speed)
-    if getgenv().WalkSpeedConnection then
-        getgenv().WalkSpeedConnection:Disconnect()
-        getgenv().WalkSpeedConnection = nil
-    end
+export("EnableWalkSpeed", walk.enable)
+export("DisableWalkSpeed", function(fallback)
+	local ok = walk.disable(fallback)
+	env.WalkSpeedConnection = nil
+	return ok
+end)
 
-    local function Attach(char)
-        local humanoid = char:WaitForChild("Humanoid", 5)
-        if not humanoid then return end
+export("EnableJumpPower", jump.enable)
+export("DisableJumpPower", jump.disable)
 
-        humanoid.WalkSpeed = speed
-        getgenv().WalkSpeedConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-            if humanoid.WalkSpeed ~= speed then
-                humanoid.WalkSpeed = speed
-            end
-        end)
-    end
+-- ============================================================
+-- Infinite Jump
+-- ============================================================
+export("EnableInfiniteJump", function(enabled)
+	if env.InfiniteJumpConnection then
+		env.InfiniteJumpConnection:Disconnect()
+		env.InfiniteJumpConnection = nil
+	end
 
-    if LocalPlayer.Character then task.spawn(Attach, LocalPlayer.Character) end
-    LocalPlayer.CharacterAdded:Connect(Attach)
+	if enabled then
+		env.InfiniteJumpConnection = track(UserInputService.JumpRequest:Connect(function()
+			local hum = getHumanoid()
+			if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+		end))
+	end
+	return true
+end)
+
+-- ============================================================
+-- Noclip (remembers which parts it changed and restores them)
+-- ============================================================
+local noclipChanged = setmetatable({}, { __mode = "k" })
+
+export("RunNoclip", function(enabled)
+	if env.NoclipConnection then
+		env.NoclipConnection:Disconnect()
+		env.NoclipConnection = nil
+	end
+
+	if enabled then
+		env.NoclipConnection = track(RunService.Stepped:Connect(function()
+			local char = LocalPlayer.Character
+			if not char then return end
+			for _, part in ipairs(char:GetDescendants()) do
+				if part:IsA("BasePart") and part.CanCollide then
+					noclipChanged[part] = true
+					part.CanCollide = false
+				end
+			end
+		end))
+	else
+		for part in pairs(noclipChanged) do
+			if part.Parent then part.CanCollide = true end
+		end
+		table.clear(noclipChanged)
+	end
+	return true
+end)
+
+-- ============================================================
+-- Field of View (holds the value even if the game changes it)
+-- ============================================================
+local fovTarget, fovOriginal, fovConn, fovCamConn
+
+local function bindFov()
+	if fovConn then fovConn:Disconnect(); fovConn = nil end
+	local cam = workspace.CurrentCamera
+	if not cam or fovTarget == nil then return end
+
+	cam.FieldOfView = fovTarget
+	fovConn = cam:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+		if fovTarget ~= nil and cam.FieldOfView ~= fovTarget then
+			cam.FieldOfView = fovTarget
+		end
+	end)
 end
 
--- Infinite Jump Handler
-getgenv().EnableInfiniteJump = function(enabled)
-    if getgenv().InfiniteJumpConnection then
-        getgenv().InfiniteJumpConnection:Disconnect()
-        getgenv().InfiniteJumpConnection = nil
-    end
+export("SetFOV", function(value)
+	value = tonumber(value)
+	local cam = workspace.CurrentCamera
+	if not value or not cam then return false end
 
-    if enabled then
-        getgenv().InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
-            if LocalPlayer.Character then
-                local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                end
-            end
-        end)
-    end
+	if fovTarget == nil then fovOriginal = cam.FieldOfView end
+	fovTarget = value
+
+	if not fovCamConn then
+		fovCamConn = track(workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindFov))
+	end
+	bindFov()
+	return true
+end)
+
+export("ResetFOV", function()
+	local original = fovOriginal
+	fovTarget, fovOriginal = nil, nil
+
+	if fovConn then fovConn:Disconnect(); fovConn = nil end
+	if fovCamConn then fovCamConn:Disconnect(); fovCamConn = nil end
+
+	local cam = workspace.CurrentCamera
+	if cam and original then cam.FieldOfView = original end
+	return true
+end)
+
+-- ============================================================
+-- Performance
+-- ============================================================
+export("Set3dRendering", function(enabled)
+	RunService:Set3dRenderingEnabled(enabled == true)
+	return true
+end)
+
+export("SetFPSCap", function(cap)
+	cap = tonumber(cap)
+	if type(setfpscap) ~= "function" or not cap then return false end
+	return (pcall(setfpscap, cap))
+end)
+
+-- ============================================================
+-- Server
+-- ============================================================
+export("RejoinServer", function()
+	local ok, err = pcall(function()
+		if #Players:GetPlayers() <= 1 then
+			-- Alone in the server: TeleportToPlaceInstance would fail
+			TeleportService:Teleport(game.PlaceId, LocalPlayer)
+		else
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+		end
+	end)
+	if not ok then warn("[Helpers] RejoinServer failed: " .. tostring(err)) end
+	return ok
+end)
+
+local function copy(text)
+	if type(setClip) ~= "function" then return false end
+	return (pcall(setClip, tostring(text)))
 end
 
--- Noclip Loop
-getgenv().RunNoclip = function(enabled)
-    if getgenv().NoclipConnection then
-        getgenv().NoclipConnection:Disconnect()
-        getgenv().NoclipConnection = nil
-    end
+export("CopyJobID",   function() return copy(game.JobId) end)
+export("CopyGameID",  function() return copy(game.GameId) end)
+export("CopyPlaceID", function() return copy(game.PlaceId) end)
 
-    if enabled then
-        getgenv().NoclipConnection = RunService.Stepped:Connect(function()
-            if LocalPlayer.Character then
-                for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-                    if part:IsA("BasePart") and part.CanCollide then
-                        part.CanCollide = false
-                    end
-                end
-            end
-        end)
-    end
-end
+-- ============================================================
+-- Unload: switch everything off and remove every global
+-- ============================================================
+function Helpers.Unload()
+	pcall(env.DisableWalkSpeed)
+	pcall(env.DisableJumpPower)
+	pcall(env.EnableInfiniteJump, false)
+	pcall(env.RunNoclip, false)
+	pcall(env.ResetFOV)
+	pcall(env.Set3dRendering, true)
 
--- Field of View Changer
-getgenv().SetFOV = function(fovValue)
-    workspace.CurrentCamera.FieldOfView = fovValue
-end
+	for _, conn in ipairs(Helpers.Connections) do
+		pcall(function() conn:Disconnect() end)
+	end
+	table.clear(Helpers.Connections)
 
--- 3D Rendering Toggle
-getgenv().Set3dRendering = function(enabled)
-    RunService:Set3dRenderingEnabled(enabled)
-end
-
--- Rejoin Server Function
-getgenv().RejoinServer = function()
-    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-end
-
--- Copy Job ID Function
-getgenv().CopyJobID = function()
-    if setclipboard then
-        setclipboard(game.JobId)
-    end
-end
-
--- Copy Game ID Function
-getgenv().CopyGameID = function()
-    if setclipboard then
-        setclipboard(game.GameId)
-    end
-end
-
--- Copy  Place ID Function
-getgenv().CopyPlaceID = function()
-    if setclipboard then
-        setclipboard(game.PlaceId)
-    end
+	for name in pairs(Helpers.Exports) do env[name] = nil end
+	env.InfiniteJumpConnection = nil
+	env.NoclipConnection = nil
+	env.WalkSpeedConnection = nil
+	if env.__Helpers == Helpers then env.__Helpers = nil end
 end
