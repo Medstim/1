@@ -1,25 +1,3 @@
---[[
-    Functions [SETTINGS & EXTRA]  v2.0
-
-    Same global names as before, so existing scripts keep working:
-      EnableWalkSpeed(speed)   DisableWalkSpeed([fallback])
-      EnableInfiniteJump(bool) RunNoclip(bool)
-      SetFOV(value)            Set3dRendering(bool)
-      RejoinServer()           CopyJobID() CopyGameID() CopyPlaceID()
-      AntiAFK (flag, default on unless set to false)
-
-    New:
-      EnableJumpPower(value)   DisableJumpPower([fallback])
-      ResetFOV()               SetFPSCap(number)
-      SetAntiAFK(bool)         __Helpers.Unload()
-
-    Notes
-      - Safe to execute more than once: the previous copy is unloaded first.
-      - Every Enable* has a matching way to switch it off and restore the
-        value the game had before.
-      - Copy* and the setters return true/false so the UI can report success.
-]]
-
 local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService       = game:GetService("RunService")
