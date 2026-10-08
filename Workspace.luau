@@ -1,18 +1,3 @@
---[[
-    Cobalt
-    A runtime developer tool to monitor and intercept network traffic
-    coming from the roblox game engine.
-    
-    This script is NOT intended to be modified.
-    To view the source code, see the 'Src' folder on the official GitLab repository!
-
-    Authors: deivid, upio
-    GitLab: https://gitlab.com/upio/cobalt/
---]]
-
-
--- ++++++++ WAX BUNDLED DATA BELOW ++++++++ --
-
 -- Will be used later for getting flattened globals
 local ImportGlobals
 
