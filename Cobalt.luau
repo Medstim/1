@@ -1,9 +1,24 @@
+--[[
+    Cobalt
+    A runtime developer tool to monitor and intercept network traffic
+    coming from the roblox game engine.
+    
+    This script is NOT intended to be modified.
+    To view the source code, see the 'Src' folder on the official GitLab repository!
+
+    Authors: deivid, upio
+    GitLab: https://gitlab.com/upio/cobalt/
+--]]
+
+
+-- ++++++++ WAX BUNDLED DATA BELOW ++++++++ --
+
 -- Will be used later for getting flattened globals
 local ImportGlobals
 
 -- Holds direct closure data (defining this before the DOM tree for line debugging etc)
 local ClosureBindings = {
-    function()local wax,script,require=ImportGlobals(1)local ImportGlobals return (function(...)wax.shared.RobloxPLStartTime = tick()
+    function()local wax,script,require,CreateLookupTable=ImportGlobals(1)local ImportGlobals return (function(...)wax.shared.CobaltStartTime = tick()
 wax.shared.IS_ACTOR = false
 
 local FileLogger = require(script.Utils.FileLog)
@@ -24,7 +39,21 @@ for _, Service in pairs({
 	wax.shared[Service] = cloneref(game:GetService(Service))
 end
 
-wax.shared.RobloxPLVerificationToken = wax.shared.HttpService:GenerateGUID()
+wax.shared.GetTextBounds = function(Text: string, Font: Font, Size: number, Width: number?): (number, number)
+	local Params = Instance.new("GetTextBoundsParams")
+	Params.Text = Text
+	Params.RichText = true
+	Params.Font = Font
+	Params.Size = Size
+	Params.Width = Width or workspace.CurrentCamera.ViewportSize.X - 32
+
+	local Bounds = wax.shared.TextService:GetTextBoundsAsync(Params)
+	Params:Destroy()
+
+	return Bounds.X, Bounds.Y
+end
+
+wax.shared.CobaltVerificationToken = wax.shared.HttpService:GenerateGUID()
 wax.shared.Hooks = {}
 
 -- Executor Support
@@ -227,20 +256,6 @@ wax.shared.GetTableLength = function(Table)
 	return Length
 end
 
-wax.shared.GetTextBounds = function(Text: string, Font: Font, Size: number, Width: number?): (number, number)
-	local Params = Instance.new("GetTextBoundsParams")
-	Params.Text = Text
-	Params.RichText = true
-	Params.Font = Font
-	Params.Size = Size
-	Params.Width = Width or workspace.CurrentCamera.ViewportSize.X - 32
-
-	local Bounds = wax.shared.TextService:GetTextBoundsAsync(Params)
-	Params:Destroy()
-
-	return Bounds.X, Bounds.Y
-end
-
 wax.shared.Unloaded = false
 local CleanupSpy: (() -> ())?
 
@@ -252,7 +267,7 @@ wax.shared.Unload = function()
 	local identity = getthreadidentity and getthreadidentity()
 	if setthreadidentity then setthreadidentity(8) end
 
-	local PluginManager = wax.shared.RobloxPLPluginManager
+	local PluginManager = wax.shared.CobaltPluginManager
 	if PluginManager then
 		for _, Plugin in PluginManager.Registry.Plugins do
 			if not Plugin.UnloadCallbacks then
@@ -299,8 +314,8 @@ wax.shared.Unload = function()
 	table.clear(wax.shared.Logs)
 	table.clear(wax.shared.IncomingLogConnectionFunctions)
 
-	getgenv().RobloxPLInitialized = false
-	getgenv().RobloxPL = nil
+	getgenv().CobaltInitialized = false
+	getgenv().Cobalt = nil
 
 	wax.shared.Communicator:Destroy()
 	wax.shared.ScreenGui:Destroy()
@@ -325,7 +340,7 @@ wax.shared.SetupLoggingConnection = function()
 		wax.shared.LogThread = nil
 	end
 
-	wax.shared.LogFileName = `RobloxPL/Logs/{DateTime.now():ToIsoDate():gsub(":", "_")}.log`
+	wax.shared.LogFileName = `Cobalt/Logs/{DateTime.now():ToIsoDate():gsub(":", "_")}.log`
 	local FileLog = FileLogger.new(wax.shared.LogFileName, FileLogger.LOG_LEVELS.INFO, true)
 
 	local LogQueue = {}
@@ -409,7 +424,7 @@ wax.shared.SetupLoggingConnection = function()
 					)
 
 					warn(
-						("RobloxPL: Failed to log remote communication for %s:%s - %s"):format(
+						("Cobalt: Failed to log remote communication for %s:%s - %s"):format(
 							Type or "UnknownType",
 							instanceNameForError,
 							tostring(err)
@@ -498,38 +513,38 @@ CleanupSpy = require(script.Spy)()
 local PluginManager = require(script.Utils.Plugins.Manager)
 PluginManager.SetupPlugins()
 
-wax.shared.RobloxPLPluginManager = PluginManager
+wax.shared.CobaltPluginManager = PluginManager
 
 wax.shared.Connect(wax.shared.LocalPlayer.OnTeleport:Connect(function()
 	if not wax.shared.SaveManager:GetState("ExecuteOnTeleport") then
 		return
 	end
 
-	-- getgenv().RobloxPL_LATEST_URL for dev environments
-	local RobloxPLURL = getgenv().RobloxPL_LATEST_URL
-		or "https://gitlab.com/upio/Cobalt/-/releases/permalink/latest/downloads/Cobalt.luau"
+	-- getgenv().COBALT_LATEST_URL for dev environments
+	local CobaltURL = getgenv().COBALT_LATEST_URL
+		or "https://gitlab.com/upio/cobalt/-/releases/permalink/latest/downloads/Cobalt.luau"
 	wax.shared.queue_on_teleport(string.format(
 		[[
-		if getgenv().RobloxPLAutoExecuted then
+		if getgenv().CobaltAutoExecuted then
 			return
 		end
 
-		getgenv().RobloxPLAutoExecuted = true
+		getgenv().CobaltAutoExecuted = true
 		loadstring(game:HttpGet("%s"))()
 	]],
-		RobloxPLURL
+		CobaltURL
 	))
 end))
 
-getgenv().RobloxPL = wax
+getgenv().Cobalt = wax
 
 task.wait(1)
 if AnticheatData.Disabled then
-	wax.shared.Sonner.success(`RobloxPL has bypassed {AnticheatData.Name} (anticheat detected)`)
+	wax.shared.Sonner.success(`Cobalt has bypassed {AnticheatData.Name} (anticheat detected)`)
 end
 
 end)() end,
-    function()local wax,script,require=ImportGlobals(2)local ImportGlobals return (function(...)--[[
+    function()local wax,script,require,CreateLookupTable=ImportGlobals(2)local ImportGlobals return (function(...)--[[
 
 	Very lightweight checks for various executor functions and reports whether they are working or not.
 	Some checks also verify that the function works as intended, not just that it exists.
@@ -638,18 +653,18 @@ test("FileSystem", function()
 		assert(typeof(Function) == "function", `{Name} is not a function`)
 	end
 
-	local TestDirectory = `RobloxPL-Filesystem-Test-{wax.shared.HttpService:GenerateGUID(false)}`
+	local TestDirectory = `Cobalt-Filesystem-Test-{wax.shared.HttpService:GenerateGUID(false)}`
 	local TestFile = `{TestDirectory}/test.txt`
 	local Success, Error = pcall(function()
 		makefolder(TestDirectory)
 		assert(isfolder(TestDirectory), "makefolder did not create a directory")
 
-		writefile(TestFile, "RobloxPL")
+		writefile(TestFile, "Cobalt")
 		assert(isfile(TestFile), "writefile did not create a file")
-		assert(readfile(TestFile) == "RobloxPL", "readfile did not return the written contents")
+		assert(readfile(TestFile) == "Cobalt", "readfile did not return the written contents")
 
 		appendfile(TestFile, " filesystem test")
-		assert(readfile(TestFile) == "RobloxPL filesystem test", "appendfile did not append contents")
+		assert(readfile(TestFile) == "Cobalt filesystem test", "appendfile did not append contents")
 		assert(#listfiles(TestDirectory) > 0, "listfiles did not return the test file")
 	end)
 
@@ -659,12 +674,12 @@ test("FileSystem", function()
 end, { Essential = false })
 
 local function SkipOptionalChecks(): boolean
-	if not ExecutorSupport.FileSystem.IsWorking or not isfile("RobloxPL/Settings.json") then
+	if not ExecutorSupport.FileSystem.IsWorking or not isfile("Cobalt/Settings.json") then
 		return false
 	end
 
 	local Success, Settings = pcall(function()
-		return wax.shared.HttpService:JSONDecode(readfile("RobloxPL/Settings.json"))
+		return wax.shared.HttpService:JSONDecode(readfile("Cobalt/Settings.json"))
 	end)
 	return Success and Settings.DisableNonEssentialChecks == true
 end
@@ -843,7 +858,7 @@ test("oth", function()
 	end)
 
 	AttributeChangedConnect(VIM.AttributeChanged, function(name)
-		if name ~= "RobloxPL" then
+		if name ~= "cobalt" then
 			return
 		end
 
@@ -851,7 +866,7 @@ test("oth", function()
 		coroutine.resume(Origin)
 	end)
 
-	VIM:SetAttribute("RobloxPL", true)
+	VIM:SetAttribute("cobalt", true)
 	repeat
 		task.wait()
 	until Working ~= nil or AttributeChangedCalled
@@ -1133,7 +1148,7 @@ if CheckFFlagValue("DebugRunParallelLuaOnMainThread", false) and not ExecutorSup
 			if response == "Enable Fix" then
 				setfflag("DebugRunParallelLuaOnMainThread", "true")
 				wax.shared.StarterGui:SetCore("SendNotification", {
-					Title = "RobloxPL",
+					Title = "Cobalt",
 					Text = "Please rejoin for the fix to take effect!",
 					Duration = math.huge,
 				})
@@ -1143,7 +1158,7 @@ if CheckFFlagValue("DebugRunParallelLuaOnMainThread", false) and not ExecutorSup
 		end
 
 		wax.shared.StarterGui:SetCore("SendNotification", {
-			Title = "RobloxPL",
+			Title = "Cobalt",
 			Text = "This game may use remotes in a way that your executor can't intercept. You can enable the fix and rejoin to detect them.",
 			Duration = math.huge,
 			Callback = bindable,
@@ -1165,7 +1180,7 @@ end
 return ExecutorSupport
 
 end)() end,
-    function()local wax,script,require=ImportGlobals(3)local ImportGlobals return (function(...)return function()
+    function()local wax,script,require,CreateLookupTable=ImportGlobals(3)local ImportGlobals return (function(...)return function()
 	local Hooks = script.Hooks
 	local IncomingOnlyOptions = {
 		IncomingConnections = true,
@@ -1193,7 +1208,7 @@ end)() end,
 end
 
 end)() end,
-    [5] = function()local wax,script,require=ImportGlobals(5)local ImportGlobals return (function(...)--// Imports \\--
+    [5] = function()local wax,script,require,CreateLookupTable=ImportGlobals(5)local ImportGlobals return (function(...)--// Imports \\--
 local Validation = require("@src/Utils/Validation")
 local LuaEncode = require("@src/Utils/CodeGen/Serializer/LuaEncode")
 local IsEqualToInstance = require("@src/Utils/CodeGen/Serializer/Instance").IsEqualToInstance
@@ -1240,7 +1255,7 @@ return function(Options: Options?)
 		task.spawn(require, Interceptors.Outgoing)
 	end
 
-	getgenv().RobloxPLInitialized = true
+	getgenv().CobaltInitialized = true
 
 	-- Actors use a different lua vm
 	-- This means that our main thread metatable hooks dont apply in the actor's vm
@@ -1258,7 +1273,16 @@ return function(Options: Options?)
 		local ActorEnvironmentCode = ActorsUtils.Environment.Value
 
 		local CommunicationChannelID, Channel = create_comm_channel()
-		wax.shared.ActorCommunicator = Channel
+		
+		--// Has .Internal \\--
+		if pcall(function()
+			assert(typeof(Channel.Internal) == "Instance", "im NOT volting it ⚡")
+		end) then
+			wax.shared.ActorCommunicator = Channel.Internal
+		else
+			wax.shared.ActorCommunicator = Channel
+		end
+
 
 		local IgnorePlayerModule = wax.shared.SaveManager:GetState("IgnorePlayerModule")
 		local LogBlockedRemotes = wax.shared.SaveManager:GetState("LogBlockedRemotes")
@@ -1266,7 +1290,7 @@ return function(Options: Options?)
 		local LogRobloxInternalEvents = wax.shared.SaveManager:GetState("LogRobloxInternalEvents")
 
 		local ActorData = LuaEncode({
-			Token = wax.shared.RobloxPLVerificationToken,
+			Token = wax.shared.CobaltVerificationToken,
 
 			--// Luau Hook Options \\--
 			IncomingConnections = IncomingConnections,
@@ -1284,7 +1308,7 @@ return function(Options: Options?)
 			ExecutorSupport = wax.shared.ExecutorSupport,
 		})
 
-		ActorEnvironmentCode = ActorEnvironmentCode:gsub("RobloxPL_ACTOR_DATA", ActorData)
+		ActorEnvironmentCode = ActorEnvironmentCode:gsub("COBALT_ACTOR_DATA", ActorData)
 
 		--#region Actor Logs Sync Layer
 		local function ReconstructTable(Info, CyclicRefs)
@@ -1292,7 +1316,7 @@ return function(Options: Options?)
 
 			for Key, Value in Info do
 				if type(Value) == "table" then
-					if Value["__Function"] and Value["Validation"] == wax.shared.RobloxPLVerificationToken then
+					if Value["__Function"] and Value["Validation"] == wax.shared.CobaltVerificationToken then
 						local FunctionData = table.clone(Value)
 						FunctionData["__Function"] = nil
 						FunctionData["Validation"] = nil
@@ -1301,7 +1325,7 @@ return function(Options: Options?)
 						continue
 					end
 
-					-- Check for RobloxPL Created Object
+					-- Check for Cobalt Created Object
 					if not Value["__CyclicRef"] then
 						Reconstructed[Key] = ReconstructTable(Value, CyclicRefs)
 						continue
@@ -1416,7 +1440,7 @@ return function(Options: Options?)
 		--#endregion
 
 		--#region Actor Hooking Logic
-		-- The hooking code wont run again if RobloxPL is already initialized in that Actor (to address deleted actors aka LuaStateProxy stuff)
+		-- The hooking code wont run again if cobalt is already initialized in that Actor (to address deleted actors aka LuaStateProxy stuff)
 
 		-- God this code is so ass 🥹
 		local function HookActor(TargetActor: Actor)
@@ -1571,16 +1595,7 @@ return function(Options: Options?)
 end
 
 end)() end,
-    [9] = function()local wax,script,require=ImportGlobals(9)local ImportGlobals return (function(...)--// Helpers \\--
-local function CreateLookupTable(table)
-	local LookupTable = {}
-	for _, Method in next, table do
-		LookupTable[Method] = true
-	end
-	return LookupTable
-end
-
---// Variables \\--
+    [9] = function()local wax,script,require,CreateLookupTable=ImportGlobals(9)local ImportGlobals return (function(...)--// Variables \\--
 local setfenv = setfenv
 local getconnections = wax.shared.ExecutorSupport["getconnections"].IsWorking and getconnections or function() return {} end
 
@@ -1612,7 +1627,7 @@ local SignalMapping = setmetatable({}, { __mode = "kv" })
 local ObservedConnectionInstances = setmetatable({}, { __mode = "k" })
 wax.shared.IncomingLogConnectionFunctions = LogConnectionFunctions
 
-local RobloxPLObserverEnvironmentKey = "__RobloxPLIncomingObserver"
+local CobaltObserverEnvironmentKey = "__CobaltIncomingObserver"
 
 --// Types \\--
 type InstancesToHook = RemoteEvent | UnreliableRemoteEvent | RemoteFunction | BindableEvent | BindableFunction
@@ -1713,7 +1728,7 @@ end
 --#endregion
 
 --#region Incoming Connection Stuff
-local function IsRobloxPLConnectionFunction(Function): boolean
+local function IsCobaltConnectionFunction(Function): boolean
 	if not Function then
 		return false
 	end
@@ -1723,12 +1738,12 @@ local function IsRobloxPLConnectionFunction(Function): boolean
 	end
 
 	local Success, Environment = pcall(getfenv, Function)
-	local VerificationToken = wax.shared.RobloxPLVerificationToken
+	local VerificationToken = wax.shared.CobaltVerificationToken
 	return (
 		Success
 		and VerificationToken ~= nil
 		and typeof(Environment) == "table"
-		and rawequal(rawget(Environment, RobloxPLObserverEnvironmentKey), VerificationToken)
+		and rawequal(rawget(Environment, CobaltObserverEnvironmentKey), VerificationToken)
 	)
 end
 
@@ -1779,7 +1794,7 @@ local function CreateConnectionFunction(Instance: InstancesToHook, Method: Metho
 
 				--// Get Function \\--
 				local Function = typeof(Connection.Function) == "function" and (Connection.Function) or (nil)
-				if IsRobloxPLConnectionFunction(Function) then
+				if IsCobaltConnectionFunction(Function) then
 					continue
 				end
 
@@ -1859,7 +1874,7 @@ local function CreateConnectionFunction(Instance: InstancesToHook, Method: Metho
 
 	local OriginalEnvironment = getfenv(ConnectionFunction)
 	setfenv(ConnectionFunction, setmetatable({
-		[RobloxPLObserverEnvironmentKey] = wax.shared.RobloxPLVerificationToken,
+		[CobaltObserverEnvironmentKey] = wax.shared.CobaltVerificationToken,
 	}, {
 		__index = OriginalEnvironment,
 		__newindex = OriginalEnvironment,
@@ -1985,7 +2000,7 @@ local function GetOriginalScript(OriginalEnv: { [string]: any}): Instance?
 end
 
 --[[
-	Restores the callback detours for the given instances. Used for RobloxPL unloading.
+	Restores the callback detours for the given instances. Used for cobalt unloading.
 	NOTE: Keep this in here so Actors can rely on wax.shared.RestoreCallbackDetours
 ]]
 wax.shared.RestoreCallbackDetours = function()
@@ -2234,15 +2249,7 @@ return function(Options: Options?)
 end
 
 end)() end,
-    [10] = function()local wax,script,require=ImportGlobals(10)local ImportGlobals return (function(...)local function CreateLookupTable(table)
-	local LookupTable = {}
-	for _, Method in next, table do
-		LookupTable[Method] = true
-	end
-	return LookupTable
-end
-
-local NamecallMethods = {
+    [10] = function()local wax,script,require,CreateLookupTable=ImportGlobals(10)local ImportGlobals return (function(...)local NamecallMethods = {
 	["FireServer"] = CreateLookupTable({"RemoteEvent", "UnreliableRemoteEvent"}),
 	["fireServer"] = CreateLookupTable({"RemoteEvent", "UnreliableRemoteEvent"}),
 	
@@ -2574,7 +2581,7 @@ for _, Function in next, FunctionsToHook do
 end
 
 end)() end,
-    [11] = function()local wax,script,require=ImportGlobals(11)local ImportGlobals return (function(...)--// Imports \\--
+    [11] = function()local wax,script,require,CreateLookupTable=ImportGlobals(11)local ImportGlobals return (function(...)--// Imports \\--
 local LookupModule = require("@src/Utils/Hook/RakNet/Lookup")
 local raknet = require("@src/Utils/Hook/RakNet/Wrapper")
 local InvocationTracker = require(script.InvocationTracker)
@@ -2604,7 +2611,7 @@ return function()
 end
 
 end)() end,
-    [12] = function()local wax,script,require=ImportGlobals(12)local ImportGlobals return (function(...)local Parser = require("@src/Utils/Hook/RakNet/Variant/Parser")
+    [12] = function()local wax,script,require,CreateLookupTable=ImportGlobals(12)local ImportGlobals return (function(...)local Parser = require("@src/Utils/Hook/RakNet/Variant/Parser")
 
 local SafePack = wax.shared.SafePack
 
@@ -2627,7 +2634,7 @@ end
 return InterceptorUtils
 
 end)() end,
-    [14] = function()local wax,script,require=ImportGlobals(14)local ImportGlobals return (function(...)--// Imports \\--
+    [14] = function()local wax,script,require,CreateLookupTable=ImportGlobals(14)local ImportGlobals return (function(...)--// Imports \\--
 local raknet = require("@src/Utils/Hook/RakNet/Wrapper")
 local Constants = require("@src/Utils/Hook/RakNet/Constants")
 local ProcessPacket = require("@src/Spy/Hooks/RakNet/PacketProcessor")
@@ -2744,7 +2751,7 @@ return function(Requests: Requests)
 end
 
 end)() end,
-    [15] = function()local wax,script,require=ImportGlobals(15)local ImportGlobals return (function(...)--// Imports \\--
+    [15] = function()local wax,script,require,CreateLookupTable=ImportGlobals(15)local ImportGlobals return (function(...)--// Imports \\--
 local raknet = require("@src/Utils/Hook/RakNet/Wrapper")
 local Constants = require("@src/Utils/Hook/RakNet/Constants")
 local ProcessPacket = require("@src/Spy/Hooks/RakNet/PacketProcessor")
@@ -2856,7 +2863,7 @@ return function(Requests: Requests)
 end
 
 end)() end,
-    [16] = function()local wax,script,require=ImportGlobals(16)local ImportGlobals return (function(...)local DEFAULT_TIMEOUT_SECONDS = 1500
+    [16] = function()local wax,script,require,CreateLookupTable=ImportGlobals(16)local ImportGlobals return (function(...)local DEFAULT_TIMEOUT_SECONDS = 1500
 
 local InvocationTracker = {}
 InvocationTracker.__index = InvocationTracker
@@ -2955,7 +2962,7 @@ end
 return InvocationTracker
 
 end)() end,
-    [17] = function()local wax,script,require=ImportGlobals(17)local ImportGlobals return (function(...)--// Imports \\--
+    [17] = function()local wax,script,require,CreateLookupTable=ImportGlobals(17)local ImportGlobals return (function(...)--// Imports \\--
 local raknet = require("@src/Utils/Hook/RakNet/Wrapper")
 local Constants = require("@src/Utils/Hook/RakNet/Constants")
 
@@ -3226,7 +3233,7 @@ return function(
 end
 
 end)() end,
-    [20] = function()local wax,script,require=ImportGlobals(20)local ImportGlobals return (function(...)--[[
+    [20] = function()local wax,script,require,CreateLookupTable=ImportGlobals(20)local ImportGlobals return (function(...)--[[
     Bypasses for popular roblox anticheats
 ]]
 
@@ -3295,7 +3302,7 @@ end
 return AnticheatData
 
 end)() end,
-    [22] = function()local wax,script,require=ImportGlobals(22)local ImportGlobals return (function(...)local Adonis = {
+    [22] = function()local wax,script,require,CreateLookupTable=ImportGlobals(22)local ImportGlobals return (function(...)local Adonis = {
 	Name = "Adonis",
 	Game = "*",
 }
@@ -3374,7 +3381,7 @@ end
 return Adonis
 
 end)() end,
-    [24] = function()local wax,script,require=ImportGlobals(24)local ImportGlobals return (function(...)local Operators = wax.shared.CallFilterOperators or require("@src/Utils/CallFilter/Operators")
+    [24] = function()local wax,script,require,CreateLookupTable=ImportGlobals(24)local ImportGlobals return (function(...)local Operators = wax.shared.CallFilterOperators or require("@src/Utils/CallFilter/Operators")
 local InstanceSerializer = wax.shared.InstanceSerializer or require("@src/Utils/CodeGen/Serializer/Instance")
 local Validation = wax.shared.Validation or require("@src/Utils/Validation")
 local CallFilterSchema = wax.shared.CallFilterSchema or require("@src/Utils/CallFilter/Schema")
@@ -3570,7 +3577,7 @@ end
 return CallFilters
 
 end)() end,
-    [25] = function()local wax,script,require=ImportGlobals(25)local ImportGlobals return (function(...)local Operators = {}
+    [25] = function()local wax,script,require,CreateLookupTable=ImportGlobals(25)local ImportGlobals return (function(...)local Operators = {}
 
 local Registry = {
 	Equals = {
@@ -4012,7 +4019,7 @@ end
 return Operators
 
 end)() end,
-    [26] = function()local wax,script,require=ImportGlobals(26)local ImportGlobals return (function(...)local Operators = wax.shared.CallFilterOperators or require("@src/Utils/CallFilter/Operators")
+    [26] = function()local wax,script,require,CreateLookupTable=ImportGlobals(26)local ImportGlobals return (function(...)local Operators = wax.shared.CallFilterOperators or require("@src/Utils/CallFilter/Operators")
 
 local RemoteFields = {}
 
@@ -4134,7 +4141,7 @@ end
 return RemoteFields
 
 end)() end,
-    [27] = function()local wax,script,require=ImportGlobals(27)local ImportGlobals return (function(...)--// Imports \\--
+    [27] = function()local wax,script,require,CreateLookupTable=ImportGlobals(27)local ImportGlobals return (function(...)--// Imports \\--
 local Validation = wax.shared.Validation or require("@src/Utils/Validation")
 local Operators = wax.shared.CallFilterOperators or require("@src/Utils/CallFilter/Operators")
 local RemoteFields = wax.shared.CallFilterRemoteFields or require("@src/Utils/CallFilter/RemoteFields")
@@ -4232,7 +4239,7 @@ return {
 }
 
 end)() end,
-    [29] = function()local wax,script,require=ImportGlobals(29)local ImportGlobals return (function(...)--// Tables \\--
+    [29] = function()local wax,script,require,CreateLookupTable=ImportGlobals(29)local ImportGlobals return (function(...)--// Tables \\--
 local MethodLookupTable = {
 	Incoming = {
 		RemoteEvent = "OnClientEvent",
@@ -4360,7 +4367,7 @@ end
 return Classifier
 
 end)() end,
-    [30] = function()local wax,script,require=ImportGlobals(30)local ImportGlobals return (function(...)local Formatter = {}
+    [30] = function()local wax,script,require,CreateLookupTable=ImportGlobals(30)local ImportGlobals return (function(...)local Formatter = {}
 
 --#region @export "FormatLuaLiteral"
 --// Populate CleanTable \\--
@@ -4463,7 +4470,7 @@ end
 return Formatter
 
 end)() end,
-    [31] = function()local wax,script,require=ImportGlobals(31)local ImportGlobals return (function(...)local CodeGen = {}
+    [31] = function()local wax,script,require,CreateLookupTable=ImportGlobals(31)local ImportGlobals return (function(...)local CodeGen = {}
 
 local Types = require(script.Parent.Types)
 
@@ -4503,7 +4510,7 @@ local Classifier = require(script.Parent.Classifier)
 		- Results: The results of the plugin handlers.
 ]]
 local function InvokePluginHandlers(Type: "Hook" | "Call", ShouldUseResult: (...any) -> boolean, ...)
-	local PluginManager = wax.shared.RobloxPLPluginManager
+	local PluginManager = wax.shared.CobaltPluginManager
 	if not PluginManager or not PluginManager.HasCodeGenInterceptors then
 		return true, nil
 	end
@@ -4513,7 +4520,7 @@ local function InvokePluginHandlers(Type: "Hook" | "Call", ShouldUseResult: (...
 	for _, Interceptor in InterceptorRegistry do
 		local Results = wax.shared.SafePack.Pack(
 			xpcall(Interceptor, function(Error)
-				warn(`Error in RobloxPL Plugin (CodeGen Interceptor ({Type})):`, Error)
+				warn(`Error in Cobalt Plugin (CodeGen Interceptor ({Type})):`, Error)
 				return Error
 			end, ...)
 		)
@@ -4531,13 +4538,13 @@ end
 
 CodeGen.GetFullPath = InstanceSerializer.Serialize
 
-local CodeGenHeaderTemplate = [[-- This code was generated by RobloxPL
--- https://gitlab.com/upio/RobloxPL
+local CodeGenHeaderTemplate = [[-- This code was generated by Cobalt
+-- https://gitlab.com/upio/cobalt
 
 ]]
 
-local CodeGenHeaderRakNetTemplate = [[-- This code was generated by RobloxPL
--- https://gitlab.com/upio/RobloxPL
+local CodeGenHeaderRakNetTemplate = [[-- This code was generated by Cobalt
+-- https://gitlab.com/upio/cobalt
 
 -- Code derived from RakNet packets. Some outputs may be incorrect.
 
@@ -4789,7 +4796,7 @@ end
 return CodeGen
 
 end)() end,
-    [32] = function()local wax,script,require=ImportGlobals(32)local ImportGlobals return (function(...)local Renderer = {}
+    [32] = function()local wax,script,require,CreateLookupTable=ImportGlobals(32)local ImportGlobals return (function(...)local Renderer = {}
 
 local Types = require(script.Parent.Types)
 
@@ -5124,7 +5131,7 @@ end
 return Renderer
 
 end)() end,
-    [34] = function()local wax,script,require=ImportGlobals(34)local ImportGlobals return (function(...)local InstanceSerializer = {}
+    [34] = function()local wax,script,require,CreateLookupTable=ImportGlobals(34)local ImportGlobals return (function(...)local InstanceSerializer = {}
 
 local Formatter = require(script.Parent.Parent.Formatter)
 local ReferencingTemplate = require(script.Parent.Parent.Templates.Referencing)
@@ -5183,7 +5190,7 @@ end
 		- Results: The results of the plugin handlers.
 ]]
 local function InvokePluginHandlers(ShouldUseResult: (...any) -> boolean, ...)
-	local PluginManager = wax.shared.RobloxPLPluginManager
+	local PluginManager = wax.shared.CobaltPluginManager
 	if PluginManager and PluginManager.HasCodeGenInterceptors then
 		local Interceptors = PluginManager.Registry.UIHooks.CodeGen.InstancePath
 
@@ -5198,7 +5205,7 @@ local function InvokePluginHandlers(ShouldUseResult: (...any) -> boolean, ...)
 				end
 			else
 				warn(
-					`Error in RobloxPL Plugin (CodeGen Interceptor (InstancePath)):`,
+					`Error in Cobalt Plugin (CodeGen Interceptor (InstancePath)):`,
 					table.unpack(Results, 2, Results.n)
 				)
 			end
@@ -5419,7 +5426,7 @@ InstanceSerializer.IsEqualToInstance = IsEqualToInstance
 return InstanceSerializer
 
 end)() end,
-    [35] = function()local wax,script,require=ImportGlobals(35)local ImportGlobals return (function(...)-- LuaEncode - Fast table serialization library for pure Luau/Lua 5.1+
+    [35] = function()local wax,script,require,CreateLookupTable=ImportGlobals(35)local ImportGlobals return (function(...)-- LuaEncode - Fast table serialization library for pure Luau/Lua 5.1+
 -- MIT License | Copyright (c) 2022-2025 Chad Hyatt <chad@hyatt.page>
 -- https://github.com/chadhyatt/LuaEncode
 
@@ -6445,7 +6452,7 @@ end
 return LuaEncode
 
 end)() end,
-    [36] = function()local wax,script,require=ImportGlobals(36)local ImportGlobals return (function(...)local Utils = script.Parent.Parent.Parent
+    [36] = function()local wax,script,require,CreateLookupTable=ImportGlobals(36)local ImportGlobals return (function(...)local Utils = script.Parent.Parent.Parent
 
 local LuaEncode = require(script.Parent.LuaEncode)
 local InstanceSerializer = require(script.Parent.Instance)
@@ -6511,7 +6518,7 @@ function Session:SortCalls(AllCalls)
 end
 
 function Session:GetSessionData(AllCalls)
-	local StartTime = wax.shared.RobloxPLStartTime or tick()
+	local StartTime = wax.shared.CobaltStartTime or tick()
 	local EndTime = AllCalls[#AllCalls] and AllCalls[#AllCalls].CreationTime or tick()
 	local Duration = math.max(0.1, EndTime - StartTime)
 	local SessionId = wax.shared.HttpService:GenerateGUID(false)
@@ -6674,7 +6681,7 @@ end
 return Session
 
 end)() end,
-    [38] = function()local wax,script,require=ImportGlobals(38)local ImportGlobals return (function(...)return {
+    [38] = function()local wax,script,require,CreateLookupTable=ImportGlobals(38)local ImportGlobals return (function(...)return {
     TargetedWrapper = {
         Text = table.concat({
             "{{Prelude}}",
@@ -6695,7 +6702,7 @@ end)() end,
     }
 }
 end)() end,
-    [39] = function()local wax,script,require=ImportGlobals(39)local ImportGlobals return (function(...)local CallTemplates = {}
+    [39] = function()local wax,script,require,CreateLookupTable=ImportGlobals(39)local ImportGlobals return (function(...)local CallTemplates = {}
 
 CallTemplates.IncomingCallbackInvoke = [[{{Prelude}}{{Path}}
 local Callback = getcallbackvalue(Event, "{{Method}}")
@@ -6721,7 +6728,7 @@ CallTemplates.Outgoing = CallTemplates.OutgoingCall
 return CallTemplates
 
 end)() end,
-    [40] = function()local wax,script,require=ImportGlobals(40)local ImportGlobals return (function(...)local HookTemplates = {}
+    [40] = function()local wax,script,require,CreateLookupTable=ImportGlobals(40)local ImportGlobals return (function(...)local HookTemplates = {}
 
 HookTemplates.IncomingCallbackReturn = [[{{Prelude}}{{Path}}
 local Callback = getcallbackvalue(Event, "{{Method}}")
@@ -6864,7 +6871,7 @@ HookTemplates.Outgoing = HookTemplates.OutgoingRemoteCall
 return HookTemplates
 
 end)() end,
-    [41] = function()local wax,script,require=ImportGlobals(41)local ImportGlobals return (function(...)local GetNilCode = [[local function GetNil(Name, DebugId)
+    [41] = function()local wax,script,require,CreateLookupTable=ImportGlobals(41)local ImportGlobals return (function(...)local GetNilCode = [[local function GetNil(Name, DebugId)
 	for _, Object in getnilinstances() do
 		if Object.Name == Name and Object:GetDebugId() == DebugId then
 			return Object
@@ -6915,7 +6922,7 @@ return {
     GetEventReferenceCode = GetEventReferenceCode,
 }
 end)() end,
-    [43] = function()local wax,script,require=ImportGlobals(43)local ImportGlobals return (function(...)export type SupportedRemoteTypes = RemoteEvent | RemoteFunction | BindableEvent | BindableFunction | UnreliableRemoteEvent
+    [43] = function()local wax,script,require,CreateLookupTable=ImportGlobals(43)local ImportGlobals return (function(...)export type SupportedRemoteTypes = RemoteEvent | RemoteFunction | BindableEvent | BindableFunction | UnreliableRemoteEvent
 export type Direction = "Incoming" | "Outgoing"
 
 export type CallInfo = {
@@ -6965,7 +6972,7 @@ export type Scenario = {
 return {}
 
 end)() end,
-    [44] = function()local wax,script,require=ImportGlobals(44)local ImportGlobals return (function(...)local Connections = {}
+    [44] = function()local wax,script,require,CreateLookupTable=ImportGlobals(44)local ImportGlobals return (function(...)local Connections = {}
 
 local function Connect(Connection)
 	table.insert(Connections, Connection)
@@ -6990,7 +6997,7 @@ wax.shared.Disconnect = Disconnect
 return Connect
 
 end)() end,
-    [45] = function()local wax,script,require=ImportGlobals(45)local ImportGlobals return (function(...)local FileHelper = {}
+    [45] = function()local wax,script,require,CreateLookupTable=ImportGlobals(45)local ImportGlobals return (function(...)local FileHelper = {}
 FileHelper.__index = FileHelper
 
 local function IsFilesystemAvailable(): boolean
@@ -7253,7 +7260,7 @@ end
 return FileHelper
 
 end)() end,
-    [46] = function()local wax,script,require=ImportGlobals(46)local ImportGlobals return (function(...)-- Logger
+    [46] = function()local wax,script,require,CreateLookupTable=ImportGlobals(46)local ImportGlobals return (function(...)-- Logger
 -- ActualMasterOogway
 -- December 8, 2024
 
@@ -7413,7 +7420,7 @@ end
 return Logger
 
 end)() end,
-    [48] = function()local wax,script,require=ImportGlobals(48)local ImportGlobals return (function(...)local Hooking = {}
+    [48] = function()local wax,script,require,CreateLookupTable=ImportGlobals(48)local ImportGlobals return (function(...)local Hooking = {}
 
 Hooking.HookFunction = function(Original, Replacement, Filter)
 	if
@@ -7499,7 +7506,7 @@ end
 return Hooking
 
 end)() end,
-    [50] = function()local wax,script,require=ImportGlobals(50)local ImportGlobals return (function(...)local Codec = {}
+    [50] = function()local wax,script,require,CreateLookupTable=ImportGlobals(50)local ImportGlobals return (function(...)local Codec = {}
 
 -- Network CFrame specials use the same sparse rot_id bytes as rbx-dom/attributes
 local CFRAME_SPECIALS: { [number]: { number } } = {
@@ -7719,7 +7726,7 @@ end
 return Codec
 
 end)() end,
-    [51] = function()local wax,script,require=ImportGlobals(51)local ImportGlobals return (function(...)local NetworkSchema = {}
+    [51] = function()local wax,script,require,CreateLookupTable=ImportGlobals(51)local ImportGlobals return (function(...)local NetworkSchema = {}
 local EnumLookupTable = {}
 do
 	if raknet and raknet.get_network_schema then
@@ -8372,7 +8379,7 @@ end
 return Constants
 
 end)() end,
-    [52] = function()local wax,script,require=ImportGlobals(52)local ImportGlobals return (function(...)local Codec = require(script.Parent.Codec)
+    [52] = function()local wax,script,require,CreateLookupTable=ImportGlobals(52)local ImportGlobals return (function(...)local Codec = require(script.Parent.Codec)
 
 local LookupModule = {
 	Instance = {
@@ -8458,7 +8465,7 @@ end
 return LookupModule
 
 end)() end,
-    [55] = function()local wax,script,require=ImportGlobals(55)local ImportGlobals return (function(...)--// Imports \\--
+    [55] = function()local wax,script,require,CreateLookupTable=ImportGlobals(55)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
@@ -8530,7 +8537,7 @@ end
 return DecoderModule
 
 end)() end,
-    [56] = function()local wax,script,require=ImportGlobals(56)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [56] = function()local wax,script,require,CreateLookupTable=ImportGlobals(56)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local AXIS_VALUES = {
 	Enum.Axis.X,
@@ -8559,7 +8566,7 @@ end
 return DecoderModule
 
 end)() end,
-    [57] = function()local wax,script,require=ImportGlobals(57)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [57] = function()local wax,script,require,CreateLookupTable=ImportGlobals(57)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.Bool,
@@ -8575,7 +8582,7 @@ end
 return DecoderModule
 
 end)() end,
-    [58] = function()local wax,script,require=ImportGlobals(58)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [58] = function()local wax,script,require,CreateLookupTable=ImportGlobals(58)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.BrickColor,
@@ -8592,7 +8599,7 @@ end
 return DecoderModule
 
 end)() end,
-    [59] = function()local wax,script,require=ImportGlobals(59)local ImportGlobals return (function(...)--// Imports \\--
+    [59] = function()local wax,script,require,CreateLookupTable=ImportGlobals(59)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
@@ -8618,7 +8625,7 @@ end
 return DecoderModule
 
 end)() end,
-    [60] = function()local wax,script,require=ImportGlobals(60)local ImportGlobals return (function(...)--// Imports \\--
+    [60] = function()local wax,script,require,CreateLookupTable=ImportGlobals(60)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
@@ -8641,7 +8648,7 @@ end
 return DecoderModule
 
 end)() end,
-    [61] = function()local wax,script,require=ImportGlobals(61)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [61] = function()local wax,script,require,CreateLookupTable=ImportGlobals(61)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 --// Constants \\--
 local COLOR3_TYPE = VariantTypes.Color3
@@ -8680,7 +8687,7 @@ end
 return DecoderModule
 
 end)() end,
-    [62] = function()local wax,script,require=ImportGlobals(62)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [62] = function()local wax,script,require,CreateLookupTable=ImportGlobals(62)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 --// Constants \\--
 local COLOR_SEQUENCE_TYPE = VariantTypes.ColorSequence
@@ -8740,7 +8747,7 @@ end
 return DecoderModule
 
 end)() end,
-    [63] = function()local wax,script,require=ImportGlobals(63)local ImportGlobals return (function(...)--// Imports \\--
+    [63] = function()local wax,script,require,CreateLookupTable=ImportGlobals(63)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local Lookup = require(script.Parent.Parent.Parent.Lookup)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
@@ -8843,7 +8850,7 @@ end
 return DecoderModule
 
 end)() end,
-    [64] = function()local wax,script,require=ImportGlobals(64)local ImportGlobals return (function(...)--// Imports \\--
+    [64] = function()local wax,script,require,CreateLookupTable=ImportGlobals(64)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
@@ -8862,7 +8869,7 @@ end
 return DecoderModule
 
 end)() end,
-    [65] = function()local wax,script,require=ImportGlobals(65)local ImportGlobals return (function(...)--// Imports \\--
+    [65] = function()local wax,script,require,CreateLookupTable=ImportGlobals(65)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
@@ -8910,7 +8917,7 @@ end
 return DecoderModule
 
 end)() end,
-    [66] = function()local wax,script,require=ImportGlobals(66)local ImportGlobals return (function(...)--// Imports \\--
+    [66] = function()local wax,script,require,CreateLookupTable=ImportGlobals(66)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local Constants = require(script.Parent.Parent.Parent.Constants)
 
@@ -8968,7 +8975,7 @@ end
 return DecoderModule
 
 end)() end,
-    [67] = function()local wax,script,require=ImportGlobals(67)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [67] = function()local wax,script,require,CreateLookupTable=ImportGlobals(67)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local FACE_NORMALS = {
 	Enum.NormalId.Right,
@@ -9000,7 +9007,7 @@ end
 return DecoderModule
 
 end)() end,
-    [68] = function()local wax,script,require=ImportGlobals(68)local ImportGlobals return (function(...)--// Imports \\--
+    [68] = function()local wax,script,require,CreateLookupTable=ImportGlobals(68)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
@@ -9087,7 +9094,7 @@ end
 return DecoderModule
 
 end)() end,
-    [69] = function()local wax,script,require=ImportGlobals(69)local ImportGlobals return (function(...)--// Imports \\--
+    [69] = function()local wax,script,require,CreateLookupTable=ImportGlobals(69)local ImportGlobals return (function(...)--// Imports \\--
 local RakNet = script:FindFirstAncestor("RakNet")
 
 local Codec = require(RakNet.Codec)
@@ -9121,7 +9128,7 @@ end
 return DecoderModule
 
 end)() end,
-    [70] = function()local wax,script,require=ImportGlobals(70)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [70] = function()local wax,script,require,CreateLookupTable=ImportGlobals(70)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local NIL_TYPE = VariantTypes.Nil
 local NIL_ALT_TYPE = VariantTypes.NilAlt
@@ -9140,7 +9147,7 @@ end
 return DecoderModule
 
 end)() end,
-    [71] = function()local wax,script,require=ImportGlobals(71)local ImportGlobals return (function(...)--// Imports \\--
+    [71] = function()local wax,script,require,CreateLookupTable=ImportGlobals(71)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
@@ -9202,7 +9209,7 @@ end
 return DecoderModule
 
 end)() end,
-    [72] = function()local wax,script,require=ImportGlobals(72)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [72] = function()local wax,script,require,CreateLookupTable=ImportGlobals(72)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.NumberRange,
@@ -9220,7 +9227,7 @@ end
 return DecoderModule
 
 end)() end,
-    [73] = function()local wax,script,require=ImportGlobals(73)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [73] = function()local wax,script,require,CreateLookupTable=ImportGlobals(73)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 --// Constants \\--
 local NUMBER_SEQUENCE_TYPE = VariantTypes.NumberSequence
@@ -9278,7 +9285,7 @@ end
 return DecoderModule
 
 end)() end,
-    [74] = function()local wax,script,require=ImportGlobals(74)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [74] = function()local wax,script,require,CreateLookupTable=ImportGlobals(74)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 --// Constants \\--
 local FACS_DATA_TYPE = VariantTypes.FacsReplicationData
@@ -9315,7 +9322,7 @@ end
 return DecoderModule
 
 end)() end,
-    [75] = function()local wax,script,require=ImportGlobals(75)local ImportGlobals return (function(...)--// Imports \\--
+    [75] = function()local wax,script,require,CreateLookupTable=ImportGlobals(75)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
@@ -9338,7 +9345,7 @@ end
 return DecoderModule
 
 end)() end,
-    [76] = function()local wax,script,require=ImportGlobals(76)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [76] = function()local wax,script,require,CreateLookupTable=ImportGlobals(76)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.PathWaypoint,
@@ -9373,7 +9380,7 @@ end
 return DecoderModule
 
 end)() end,
-    [77] = function()local wax,script,require=ImportGlobals(77)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [77] = function()local wax,script,require,CreateLookupTable=ImportGlobals(77)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.PhysicalProperties,
@@ -9423,7 +9430,7 @@ end
 return DecoderModule
 
 end)() end,
-    [78] = function()local wax,script,require=ImportGlobals(78)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [78] = function()local wax,script,require,CreateLookupTable=ImportGlobals(78)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.Ray,
@@ -9445,7 +9452,7 @@ end
 return DecoderModule
 
 end)() end,
-    [79] = function()local wax,script,require=ImportGlobals(79)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [79] = function()local wax,script,require,CreateLookupTable=ImportGlobals(79)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.Rect2D,
@@ -9465,7 +9472,7 @@ end
 return DecoderModule
 
 end)() end,
-    [80] = function()local wax,script,require=ImportGlobals(80)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [80] = function()local wax,script,require,CreateLookupTable=ImportGlobals(80)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 --// Constants \\--
 local REGION3_TYPE = VariantTypes.Region3
@@ -9510,7 +9517,7 @@ end
 return DecoderModule
 
 end)() end,
-    [81] = function()local wax,script,require=ImportGlobals(81)local ImportGlobals return (function(...)local Codec = require(script.Parent.Parent.Parent.Codec)
+    [81] = function()local wax,script,require,CreateLookupTable=ImportGlobals(81)local ImportGlobals return (function(...)local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
@@ -9569,7 +9576,7 @@ end
 return DecoderModule
 
 end)() end,
-    [82] = function()local wax,script,require=ImportGlobals(82)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [82] = function()local wax,script,require,CreateLookupTable=ImportGlobals(82)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 -- Enum.SecurityCapability.Value is NOT the bit index — engine uses a sparse map.
 local BIT_TO_CAPABILITY: { [number]: string } = {
@@ -9666,7 +9673,7 @@ end
 return DecoderModule
 
 end)() end,
-    [83] = function()local wax,script,require=ImportGlobals(83)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [83] = function()local wax,script,require,CreateLookupTable=ImportGlobals(83)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.SharedString,
@@ -9682,7 +9689,7 @@ end
 return DecoderModule
 
 end)() end,
-    [84] = function()local wax,script,require=ImportGlobals(84)local ImportGlobals return (function(...)--// Imports \\--
+    [84] = function()local wax,script,require,CreateLookupTable=ImportGlobals(84)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
@@ -9705,7 +9712,7 @@ end
 return DecoderModule
 
 end)() end,
-    [85] = function()local wax,script,require=ImportGlobals(85)local ImportGlobals return (function(...)--// Imports \\--
+    [85] = function()local wax,script,require,CreateLookupTable=ImportGlobals(85)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Parent.Codec)
 local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
@@ -9745,7 +9752,7 @@ end
 return DecoderModule
 
 end)() end,
-    [86] = function()local wax,script,require=ImportGlobals(86)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [86] = function()local wax,script,require,CreateLookupTable=ImportGlobals(86)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.UDim,
@@ -9763,7 +9770,7 @@ end
 return DecoderModule
 
 end)() end,
-    [87] = function()local wax,script,require=ImportGlobals(87)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [87] = function()local wax,script,require,CreateLookupTable=ImportGlobals(87)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.UDim2,
@@ -9783,7 +9790,7 @@ end
 return DecoderModule
 
 end)() end,
-    [88] = function()local wax,script,require=ImportGlobals(88)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [88] = function()local wax,script,require,CreateLookupTable=ImportGlobals(88)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local DecoderModule = {
 	Type = VariantTypes.UniqueId,
@@ -9799,7 +9806,7 @@ end
 return DecoderModule
 
 end)() end,
-    [89] = function()local wax,script,require=ImportGlobals(89)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [89] = function()local wax,script,require,CreateLookupTable=ImportGlobals(89)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 local MAX_DEPTH = 3
 
@@ -9818,7 +9825,7 @@ end
 return DecoderModule
 
 end)() end,
-    [90] = function()local wax,script,require=ImportGlobals(90)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
+    [90] = function()local wax,script,require,CreateLookupTable=ImportGlobals(90)local ImportGlobals return (function(...)local VariantTypes = require(script.Parent.Parent.Parent.Constants).VariantTypes
 
 --// Constants \\--
 local VECTOR2_TYPE = VariantTypes.Vector2
@@ -9877,7 +9884,7 @@ end
 return DecoderModule
 
 end)() end,
-    [91] = function()local wax,script,require=ImportGlobals(91)local ImportGlobals return (function(...)--// Imports \\--
+    [91] = function()local wax,script,require,CreateLookupTable=ImportGlobals(91)local ImportGlobals return (function(...)--// Imports \\--
 local Codec = require(script.Parent.Parent.Codec)
 
 --// Decoders \\--
@@ -10058,7 +10065,7 @@ end
 return Parser
 
 end)() end,
-    [92] = function()local wax,script,require=ImportGlobals(92)local ImportGlobals return (function(...)local RakNetWrapper = {
+    [92] = function()local wax,script,require,CreateLookupTable=ImportGlobals(92)local ImportGlobals return (function(...)local RakNetWrapper = {
 	Hooks = {
 		Receive = {},
 		Send = {},
@@ -10126,7 +10133,7 @@ end
 return RakNetWrapper
 
 end)() end,
-    [93] = function()local wax,script,require=ImportGlobals(93)local ImportGlobals return (function(...)local Log = {}
+    [93] = function()local wax,script,require,CreateLookupTable=ImportGlobals(93)local ImportGlobals return (function(...)local Log = {}
 Log.__index = Log
 
 local PendingCallDecisions = setmetatable({}, { __mode = "k" })
@@ -10248,7 +10255,7 @@ do
 
 					if getmetatable(Value) then
 						OutputTable[Key] =
-							"RobloxPL: Impossible to bridge table with metatable from actor Environment to main Environment"
+							"Cobalt: Impossible to bridge table with metatable from actor Environment to main Environment"
 						continue
 					end
 
@@ -10459,7 +10466,7 @@ local function RunInterceptors(Interceptors: { (...any) -> ...any }, Info: any, 
 	for _, Callback in Interceptors do
 		local Ok, Result = pcall(Callback, Info, Log.Instance, Log.Type)
 		if not Ok then
-			warn(`[RobloxPL Plugin Interceptor] Error: {Result}`)
+			warn(`[Cobalt Plugin Interceptor] Error: {Result}`)
 		elseif Result == false then
 			return true
 		end
@@ -10572,7 +10579,7 @@ function Log:Call(RawInfo): number?
 	end
 
 	--// Plugin Interceptors \\--
-	local PluginManager = wax.shared.RobloxPLPluginManager
+	local PluginManager = wax.shared.CobaltPluginManager
 	if PluginManager and PluginManager.HasInterceptors then
 		-- Run Instance-specific interceptors (both exact type and "All")
 		local InstanceIntercept = PluginManager.Registry.Interceptors.Instance[self.Instance]
@@ -10682,7 +10689,7 @@ end
 return Log
 
 end)() end,
-    [94] = function()local wax,script,require=ImportGlobals(94)local ImportGlobals return (function(...)local LogStore = {}
+    [94] = function()local wax,script,require,CreateLookupTable=ImportGlobals(94)local ImportGlobals return (function(...)local LogStore = {}
 
 local IsEqualToInstance = require("@src/Utils/CodeGen/Serializer/Instance").IsEqualToInstance
 
@@ -10719,7 +10726,7 @@ end
 return LogStore
 
 end)() end,
-    [95] = function()local wax,script,require=ImportGlobals(95)local ImportGlobals return (function(...)--[[
+    [95] = function()local wax,script,require,CreateLookupTable=ImportGlobals(95)local ImportGlobals return (function(...)--[[
 
 Pagination Module
 made by deivid and turned into module by upio
@@ -10892,15 +10899,15 @@ end
 return Pagination
 
 end)() end,
-    [98] = function()local wax,script,require=ImportGlobals(98)local ImportGlobals return (function(...)--// Imports \\--
+    [98] = function()local wax,script,require,CreateLookupTable=ImportGlobals(98)local ImportGlobals return (function(...)--// Imports \\--
 local Formatter = require("@src/Utils/CodeGen/Formatter")
 local InstanceSerializer = require("@src/Utils/CodeGen/Serializer/Instance")
 local LazySerializer = require("@src/Window/Utils/Text/LazySerializer")
 
 local CodeGen = {}
 
-function CodeGen.Apply(RobloxPL, Manager)
-	function RobloxPL.CodeGen:InterceptGeneration(
+function CodeGen.Apply(Cobalt, Manager)
+	function Cobalt.CodeGen:InterceptGeneration(
 		Type: "Call" | "Hook" | "InstancePath",
 		Callback: (Info: any, ...any) -> ...any
 	)
@@ -10919,7 +10926,7 @@ function CodeGen.Apply(RobloxPL, Manager)
 		end
 	end
 
-	function RobloxPL.CodeGen.Serialize(data, options)
+	function Cobalt.CodeGen.Serialize(data, options)
 		if typeof(data) == "table" then
 			return wax.shared.LuaEncode(data, options)
 		elseif typeof(data) == "Instance" then
@@ -10929,7 +10936,7 @@ function CodeGen.Apply(RobloxPL, Manager)
 		return LazySerializer.QuickSerializeArgument(data)
 	end
 
-	function RobloxPL.CodeGen.Indent(str: string, indent: number)
+	function Cobalt.CodeGen.Indent(str: string, indent: number)
 		return Formatter.IndentCode(str, indent)
 	end
 end
@@ -10937,17 +10944,17 @@ end
 return CodeGen
 
 end)() end,
-    [99] = function()local wax,script,require=ImportGlobals(99)local ImportGlobals return (function(...)--// Imports \\--
+    [99] = function()local wax,script,require,CreateLookupTable=ImportGlobals(99)local ImportGlobals return (function(...)--// Imports \\--
 local Types = require("@src/Utils/CodeGen/Types")
 
 local Bridge = require(script.Parent.Parent.Bridge)
 
 local Spy = {}
 
-function Spy.Apply(RobloxPL, Manager)
+function Spy.Apply(Cobalt, Manager)
 	type InterceptorFunction = (Info: Types.CallInfo, Instance: Instance, Type: "Incoming" | "Outgoing") -> ...any
 
-	function RobloxPL.Spy:InterceptExecutedCalls(
+	function Cobalt.Spy:InterceptExecutedCalls(
 		Type: "Incoming" | "Outgoing" | "All",
 		Data: {
 			Callback: InterceptorFunction,
@@ -11020,17 +11027,17 @@ function Spy.Apply(RobloxPL, Manager)
 		end
 	end
 
-	function RobloxPL.Spy:ClearLogs(Instance: Instance?, Type: string?)
+	function Cobalt.Spy:ClearLogs(Instance: Instance?, Type: string?)
 		Bridge.Get().ClearLogs(Instance, if Type == "All" then nil else Type)
 	end
 
-	function RobloxPL.Spy:AppendLog(Instance: Instance, Type: "Incoming" | "Outgoing", Data: {})
+	function Cobalt.Spy:AppendLog(Instance: Instance, Type: "Incoming" | "Outgoing", Data: {})
 		local DebugId = wax.shared.GetDebugId(Instance)
 		local Log = wax.shared.Logs[Type][DebugId] or wax.shared.NewLog(Instance, Type, nil, DebugId)
 		Log:Call(Data)
 	end
 
-	function RobloxPL:GetLog(instance: Instance, type: "Incoming" | "Outgoing")
+	function Cobalt:GetLog(instance: Instance, type: "Incoming" | "Outgoing")
 		local DebugId = wax.shared.GetDebugId(instance)
 		return wax.shared.Logs[type][DebugId]
 	end
@@ -11039,7 +11046,7 @@ end
 return Spy
 
 end)() end,
-    [100] = function()local wax,script,require=ImportGlobals(100)local ImportGlobals return (function(...)--// Imports \\--
+    [100] = function()local wax,script,require,CreateLookupTable=ImportGlobals(100)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Resize = require("@src/Window/Utils/Input/Resize")
 local Highlighter = require("@src/Window/Utils/Text/Highlighter")
@@ -11051,13 +11058,13 @@ local Bridge = require(script.Parent.Parent.Bridge)
 
 local UI = {}
 
-function UI.Apply(RobloxPL, Manager, State)
-	function RobloxPL.UI:GetSelectedRemote()
+function UI.Apply(Cobalt, Manager, State)
+	function Cobalt.UI:GetSelectedRemote()
 		local Log = Bridge.Get().GetCurrentLog()
 		return Log and Log.Instance or nil, Log and Log.Type or nil
 	end
 
-	function RobloxPL.UI:CreateModal(Title: string, Icon: string)
+	function Cobalt.UI:CreateModal(Title: string, Icon: string)
 		local WindowBridge = Bridge.Get()
 		local ModalController = WindowBridge.ModalController
 
@@ -11318,7 +11325,7 @@ function UI.Apply(RobloxPL, Manager, State)
 		return ModalInterface
 	end
 
-	function RobloxPL.UI:CreatePluginSettings()
+	function Cobalt.UI:CreatePluginSettings()
 		if not State.CurrentPluginSettings then
 			State.CurrentPluginSettings = Bridge.Get().PluginsModal.Settings:CreateSection(
 				State.CurrentPluginData.Name,
@@ -11329,7 +11336,7 @@ function UI.Apply(RobloxPL, Manager, State)
 		return State.CurrentPluginSettings
 	end
 
-	function RobloxPL.UI.RemoteInfo:CreateTab(TabName: string, Icon: string)
+	function Cobalt.UI.RemoteInfo:CreateTab(TabName: string, Icon: string)
 		local InfoModal = Bridge.Get().InfoModal
 		local TabUI, TabContent = InfoModal.Tabs:CreateTabContent()
 		InfoModal.Tabs:CreateTab(Icon, TabName, TabUI)
@@ -11337,7 +11344,7 @@ function UI.Apply(RobloxPL, Manager, State)
 		return TabContent, TabUI
 	end
 
-	function RobloxPL.UI.RemoteInfo:DisableDefaultButtons(TabName: string)
+	function Cobalt.UI.RemoteInfo:DisableDefaultButtons(TabName: string)
 		local TabRegistry = Manager.Registry.UIHooks.RemoteInfo.Tabs[TabName]
 		if not TabRegistry then
 			Manager.Registry.UIHooks.RemoteInfo.Tabs[TabName] = { DisableDefaults = true, Buttons = {} }
@@ -11345,17 +11352,17 @@ function UI.Apply(RobloxPL, Manager, State)
 			TabRegistry.DisableDefaults = true
 		end
 
-		RobloxPL.UI.RemoteInfo.UpdateFooterButtons()
+		Cobalt.UI.RemoteInfo.UpdateFooterButtons()
 	end
 
-	function RobloxPL.UI.RemoteInfo.UpdateFooterButtons()
+	function Cobalt.UI.RemoteInfo.UpdateFooterButtons()
 		local WindowBridge = Bridge.GetOptional()
 		if WindowBridge and WindowBridge.InfoModal and WindowBridge.InfoModal.Footer then
 			WindowBridge.InfoModal.Footer:UpdateDropdownButtons()
 		end
 	end
 
-	function RobloxPL.UI.RemoteInfo:AddFooterButton(TabName: string, Icon: string, Title: string, Options: {})
+	function Cobalt.UI.RemoteInfo:AddFooterButton(TabName: string, Icon: string, Title: string, Options: {})
 		local TabRegistry = Manager.Registry.UIHooks.RemoteInfo.Tabs[TabName]
 		if not TabRegistry then
 			TabRegistry = { DisableDefaults = false, Buttons = {} }
@@ -11369,7 +11376,7 @@ function UI.Apply(RobloxPL, Manager, State)
 		}
 
 		table.insert(TabRegistry.Buttons, ButtonDefinition)
-		RobloxPL.UI.RemoteInfo.UpdateFooterButtons()
+		Cobalt.UI.RemoteInfo.UpdateFooterButtons()
 
 		return function()
 			local Index = table.find(TabRegistry.Buttons, ButtonDefinition)
@@ -11380,12 +11387,12 @@ function UI.Apply(RobloxPL, Manager, State)
 					ButtonDefinition.Instance.Parent = nil
 				end
 
-				RobloxPL.UI.RemoteInfo.UpdateFooterButtons()
+				Cobalt.UI.RemoteInfo.UpdateFooterButtons()
 			end
 		end
 	end
 
-	function RobloxPL.UI.RemoteInfo:BindToModalOpen(Callback: (CallInfo: Types.CallInfo) -> ...any)
+	function Cobalt.UI.RemoteInfo:BindToModalOpen(Callback: (CallInfo: Types.CallInfo) -> ...any)
 		table.insert(Manager.Registry.UIHooks.RemoteInfo.Open, Callback)
 
 		return function()
@@ -11396,7 +11403,7 @@ function UI.Apply(RobloxPL, Manager, State)
 		end
 	end
 
-	function RobloxPL.UI.RemoteInfo:InterceptModalOpen(Callback: (CallInfo: Types.CallInfo) -> boolean?)
+	function Cobalt.UI.RemoteInfo:InterceptModalOpen(Callback: (CallInfo: Types.CallInfo) -> boolean?)
 		table.insert(Manager.Registry.UIHooks.RemoteInfo.Intercept, Callback)
 
 		return function()
@@ -11407,7 +11414,7 @@ function UI.Apply(RobloxPL, Manager, State)
 		end
 	end
 
-	function RobloxPL.UI.ContextMenu:AddOption(
+	function Cobalt.UI.ContextMenu:AddOption(
 		MenuType: "RemoteList" | "CallList",
 		Icon: string,
 		Title: string,
@@ -11415,7 +11422,7 @@ function UI.Apply(RobloxPL, Manager, State)
 	)
 		if not Manager.Registry.UIHooks.ContextMenus[MenuType] then
 			warn(
-				`[RobloxPL] Invalid MenuType provided to ContextMenu:AddOption. Expected RemoteList | CallList, got {tostring(
+				`[Cobalt] Invalid MenuType provided to ContextMenu:AddOption. Expected RemoteList | CallList, got {tostring(
 					MenuType
 				)}`
 			)
@@ -11438,19 +11445,19 @@ function UI.Apply(RobloxPL, Manager, State)
 		end
 	end
 
-	function RobloxPL.UI.ColorizeLuauCode(code: string)
+	function Cobalt.UI.ColorizeLuauCode(code: string)
 		return Highlighter.Run(code)
 	end
 
 	for Idx, Value in Interface do
-		RobloxPL.UI[Idx] = Value
+		Cobalt.UI[Idx] = Value
 	end
 end
 
 return UI
 
 end)() end,
-    [101] = function()local wax,script,require=ImportGlobals(101)local ImportGlobals return (function(...)local Bridge = {
+    [101] = function()local wax,script,require,CreateLookupTable=ImportGlobals(101)local ImportGlobals return (function(...)local Bridge = {
 	Current = nil,
 }
 
@@ -11463,7 +11470,7 @@ function Bridge.Attach(WindowBridge)
 end
 
 function Bridge.Get()
-	assert(Bridge.Current, "RobloxPL plugin window bridge has not been attached.")
+	assert(Bridge.Current, "Cobalt plugin window bridge has not been attached.")
 	return Bridge.Current
 end
 
@@ -11474,7 +11481,7 @@ end
 return Bridge
 
 end)() end,
-    [102] = function()local wax,script,require=ImportGlobals(102)local ImportGlobals return (function(...)--// Imports \\--
+    [102] = function()local wax,script,require,CreateLookupTable=ImportGlobals(102)local ImportGlobals return (function(...)--// Imports \\--
 local Metadata = require(script.Parent.Metadata)
 
 local CodeGenAPI = require(script.Parent.API.CodeGen)
@@ -11495,7 +11502,7 @@ function Environment.Create(
 		CurrentPluginSettings = nil,
 	}
 
-	local RobloxPL = {
+	local Cobalt = {
 		Sonner = wax.shared.Sonner,
 		UI = { RemoteInfo = {}, ContextMenu = {} },
 		Spy = {},
@@ -11503,7 +11510,7 @@ function Environment.Create(
 		ExecutorSupport = wax.shared.ExecutorSupport,
 	}
 
-	RobloxPL.Settings = setmetatable({}, {
+	Cobalt.Settings = setmetatable({}, {
 		__index = function(_, key)
 			return wax.shared.SaveManager:GetState(key, false)
 		end,
@@ -11512,7 +11519,7 @@ function Environment.Create(
 		end,
 	})
 
-	function RobloxPL:BindToUnload(Callback: () -> ())
+	function Cobalt:BindToUnload(Callback: () -> ())
 		for _, Plugin in Manager.Registry.Plugins do
 			if Plugin.PluginData == State.CurrentPluginData then
 				table.insert(Plugin.UnloadCallbacks, Callback)
@@ -11521,11 +11528,11 @@ function Environment.Create(
 		end
 	end
 
-	UIAPI.Apply(RobloxPL, Manager, State)
-	SpyAPI.Apply(RobloxPL, Manager)
-	CodeGenAPI.Apply(RobloxPL, Manager)
+	UIAPI.Apply(Cobalt, Manager, State)
+	SpyAPI.Apply(Cobalt, Manager)
+	CodeGenAPI.Apply(Cobalt, Manager)
 
-	setmetatable(RobloxPL, {
+	setmetatable(Cobalt, {
 		__newindex = function(_, Key, Value)
 			if Key:lower() == "plugindata" then
 				local PluginData = Metadata.Validate(Value)
@@ -11551,11 +11558,11 @@ function Environment.Create(
 				return
 			end
 
-			return rawset(RobloxPL, Key, Value)
+			return rawset(Cobalt, Key, Value)
 		end,
 	})
 
-	return setmetatable({ RobloxPL = RobloxPL }, {
+	return setmetatable({ Cobalt = Cobalt }, {
 		__index = getfenv(PluginCallback),
 	})
 end
@@ -11563,7 +11570,7 @@ end
 return Environment
 
 end)() end,
-    [103] = function()local wax,script,require=ImportGlobals(103)local ImportGlobals return (function(...)local Errors = {}
+    [103] = function()local wax,script,require,CreateLookupTable=ImportGlobals(103)local ImportGlobals return (function(...)local Errors = {}
 
 function Errors.PluginErrored(Manager, FilePath, Error)
 	if #Manager.Registry.Errored == 0 then
@@ -11607,20 +11614,20 @@ end
 return Errors
 
 end)() end,
-    [104] = function()local wax,script,require=ImportGlobals(104)local ImportGlobals return (function(...)--// Imports \\--
+    [104] = function()local wax,script,require,CreateLookupTable=ImportGlobals(104)local ImportGlobals return (function(...)--// Imports \\--
 local Environment = require(script.Parent.Environment)
 local Errors = require(script.Parent.Errors)
 
 local FileHelperUtil = require("@src/Utils/FileHelper")
 
-local PluginFiles = FileHelperUtil.new("RobloxPL/Plugins")
+local PluginFiles = FileHelperUtil.new("Cobalt/Plugins")
 
 local Loader = {}
 
 function Loader.SetupPlugins(Manager)
 	for _, FilePath in PluginFiles:ListFiles() do
 		local Plugin, CompileError =
-			loadstring(PluginFiles:ReadFile(FilePath), `RobloxPLPlugin-{PluginFiles:GetFileName(FilePath)}`)
+			loadstring(PluginFiles:ReadFile(FilePath), `CobaltPlugin-{PluginFiles:GetFileName(FilePath)}`)
 		if CompileError then
 			Errors.PluginErrored(Manager, FilePath, CompileError)
 			continue
@@ -11649,7 +11656,7 @@ end
 return Loader
 
 end)() end,
-    [105] = function()local wax,script,require=ImportGlobals(105)local ImportGlobals return (function(...)--// Imports \\--
+    [105] = function()local wax,script,require,CreateLookupTable=ImportGlobals(105)local ImportGlobals return (function(...)--// Imports \\--
 local Bridge = require(script.Parent.Bridge)
 local Loader = require(script.Parent.Loader)
 local Registry = require(script.Parent.Registry)
@@ -11674,7 +11681,7 @@ end
 return Manager
 
 end)() end,
-    [106] = function()local wax,script,require=ImportGlobals(106)local ImportGlobals return (function(...)local Metadata = {}
+    [106] = function()local wax,script,require,CreateLookupTable=ImportGlobals(106)local ImportGlobals return (function(...)local Metadata = {}
 local Validation = require("@src/Utils/Validation")
 
 local Schema = Validation.Schema
@@ -11721,7 +11728,7 @@ end
 return Metadata
 
 end)() end,
-    [107] = function()local wax,script,require=ImportGlobals(107)local ImportGlobals return (function(...)return {
+    [107] = function()local wax,script,require,CreateLookupTable=ImportGlobals(107)local ImportGlobals return (function(...)return {
 	Plugins = {},
 	Errored = {},
 	Interceptors = {
@@ -11751,7 +11758,7 @@ end)() end,
 }
 
 end)() end,
-    [108] = function()local wax,script,require=ImportGlobals(108)local ImportGlobals return (function(...)type RatelimiterOptions = {
+    [108] = function()local wax,script,require,CreateLookupTable=ImportGlobals(108)local ImportGlobals return (function(...)type RatelimiterOptions = {
 	Burst: {
 		Time: number,
 		Max: number,
@@ -11912,7 +11919,7 @@ Ratelimiter.Stop = Ratelimiter.Destroy
 return Ratelimiter
 
 end)() end,
-    [109] = function()local wax,script,require=ImportGlobals(109)local ImportGlobals return (function(...)--[[
+    [109] = function()local wax,script,require,CreateLookupTable=ImportGlobals(109)local ImportGlobals return (function(...)--[[
     SafePack
     Author: centerepic
 ]]
@@ -11948,7 +11955,7 @@ end
 return TableProxy
 
 end)() end,
-    [110] = function()local wax,script,require=ImportGlobals(110)local ImportGlobals return (function(...)local FileHelperUtil = require(script.Parent.FileHelper)
+    [110] = function()local wax,script,require,CreateLookupTable=ImportGlobals(110)local ImportGlobals return (function(...)local FileHelperUtil = require(script.Parent.FileHelper)
 local Validation = require(script.Parent.Validation)
 local Settings = require(script.Parent.Settings)
 
@@ -12000,7 +12007,7 @@ local function ApplyMigrations(State): boolean
 	return Changed
 end
 
-local FileHelper = FileHelperUtil.new("RobloxPL")
+local FileHelper = FileHelperUtil.new("Cobalt")
 FileHelper:EnsureFile("Settings.json", "{}")
 
 local Success, Error = pcall(function()
@@ -12070,7 +12077,7 @@ end
 return SaveManager
 
 end)() end,
-    [111] = function()local wax,script,require=ImportGlobals(111)local ImportGlobals return (function(...)local Registry = require(script.Registry)
+    [111] = function()local wax,script,require,CreateLookupTable=ImportGlobals(111)local ImportGlobals return (function(...)local Registry = require(script.Registry)
 
 for Name, Setting in Registry do
 	assert(Name == Setting.Key, `Setting registry key {Name} does not match setting key {Setting.Key}`)
@@ -12079,7 +12086,7 @@ end
 return Registry
 
 end)() end,
-    [112] = function()local wax,script,require=ImportGlobals(112)local ImportGlobals return (function(...)local Constants = require("@src/Window/Constants")
+    [112] = function()local wax,script,require,CreateLookupTable=ImportGlobals(112)local ImportGlobals return (function(...)local Constants = require("@src/Window/Constants")
 local Validation = require(script.Parent.Parent.Validation)
 
 local Setting = require(script.Parent.Setting)
@@ -12279,7 +12286,7 @@ return {
 		Schema = Schema.boolean(),
 		UI = {
 			Type = "Checkbox",
-			Text = "Include RobloxPL Header",
+			Text = "Include Cobalt Header",
 		},
 	}),
 
@@ -12318,7 +12325,7 @@ return {
 }
 
 end)() end,
-    [113] = function()local wax,script,require=ImportGlobals(113)local ImportGlobals return (function(...)local Validation = require(script.Parent.Parent.Validation)
+    [113] = function()local wax,script,require,CreateLookupTable=ImportGlobals(113)local ImportGlobals return (function(...)local Validation = require(script.Parent.Parent.Validation)
 
 local ControlMethods = {
 	Checkbox = "CreateCheckbox",
@@ -12386,7 +12393,7 @@ end
 return Setting
 
 end)() end,
-    [114] = function()local wax,script,require=ImportGlobals(114)local ImportGlobals return (function(...)local SignalHandler = {
+    [114] = function()local wax,script,require,CreateLookupTable=ImportGlobals(114)local ImportGlobals return (function(...)local SignalHandler = {
 	Signals = {},
 }
 
@@ -12477,19 +12484,32 @@ end
 return SignalHandler
 
 end)() end,
-    [117] = function()local wax,script,require=ImportGlobals(117)local ImportGlobals return (function(...)local Icons = {}
+    [117] = function()local wax,script,require,CreateLookupTable=ImportGlobals(117)local ImportGlobals return (function(...)local Icons = {}
+local AssetManager = require("@src/Utils/UI/Assets/Manager")
 
-type Icon = {
+type SpriteIcon = {
 	Url: string,
-	Id: number,
 	IconName: string,
 	ImageRectOffset: Vector2,
 	ImageRectSize: Vector2,
 }
 
-local Success, IconsModule = pcall(function()
+type FontIcon = {
+	FontFace: Font,
+	Text: string,
+}
+
+type LucideModule = {
+	Icons: { string },
+	GetAsset: (Name: string) -> SpriteIcon?,
+	GetFontAsset: ((Name: string) -> FontIcon?)?,
+}
+
+export type IconObject = TextLabel | TextButton | ImageLabel | ImageButton
+
+local Success, Lucide: LucideModule = pcall(function()
 	local IconFetchSuccess, IconModuleSource = pcall(request, {
-		Url = "https://raw.githubusercontent.com/mstudio45/lucide-roblox-direct/refs/heads/main/source.lua",
+		Url = "https://raw.githubusercontent.com/notpoiu/lucide-roblox-direct/refs/heads/main/source.lua",
 		Method = "GET",
 	})
 
@@ -12498,37 +12518,152 @@ local Success, IconsModule = pcall(function()
 			or IconModuleSource.StatusCode >= 200 and IconModuleSource.StatusCode < 300,
 		"Failed to fetch lucide icons direct module source"
 	)
-	return (loadstring(IconModuleSource.Body) :: () -> { Icons: { string }, GetAsset: (Name: string) -> Icon? })()
+	return (loadstring(IconModuleSource.Body) :: () -> LucideModule)()
 end)
 
-function Icons.GetIcon(iconName: string): Icon?
+--// Icon Font \\--
+local FontFace: Font? = nil
+
+if Success and typeof(Lucide.GetFontAsset) == "function" then
+	pcall(function()
+		local FontIcon = (Lucide.GetFontAsset :: (Name: string) -> FontIcon?)("circle-alert")
+		assert(FontIcon, "Failed to load lucide icon font")
+
+		local TextSize = 16
+		local Width = wax.shared.GetTextBounds(FontIcon.Text, FontIcon.FontFace, TextSize)
+		assert(math.abs(Width - TextSize) < 1, "Lucide icon font failed to render")
+
+		FontFace = FontIcon.FontFace
+	end)
+end
+
+--// Helpers \\--
+local IconMappings = {
+	Glyph = {
+		ClassNames = {
+			Label = "TextLabel",
+			Button = "TextButton",
+		},
+		Properties = {
+			IconColor3 = "TextColor3",
+			IconTransparency = "TextTransparency",
+		},
+	},
+	
+	Image = {
+		ClassNames = {
+			Label = "ImageLabel",
+			Button = "ImageButton",
+		},
+		Properties = {
+			IconColor3 = "ImageColor3",
+			IconTransparency = "ImageTransparency",
+		},
+	}
+}
+do
+	local ClassKinds = {}
+	for Kind, Mapping in IconMappings do
+		for _, ClassName in Mapping.ClassNames do
+			ClassKinds[ClassName] = Kind
+		end
+	end
+	
+	IconMappings.ClassKinds = ClassKinds
+	Icons.IconMappings = IconMappings
+end
+
+function Icons.GetIconData(Icon: string)
+	local MappingKey = (
+		(FontFace and table.find(Lucide.Icons, Icon))
+			and "Glyph"
+			or "Image"
+	)
+	local Mapping = IconMappings[MappingKey]
+
+	return MappingKey, Mapping
+end
+
+function Icons.GetClassName(Icon: string, Button: boolean?): string
+	local _, Mapping = Icons.GetIconData(Icon)
+	return Mapping.ClassNames[if Button then "Button" else "Label"]
+end
+
+function Icons.CanDisplay(Object: IconObject, Icon: string): boolean
+	return IconMappings.ClassKinds[Object.ClassName] == Icons.GetIconData(Icon)
+end
+
+function Icons.GetProperty(Object: Instance, Property: string): any
+	local ObjectKind = IconMappings.ClassKinds[Object.ClassName]
+	local PropertyToGet = IconMappings[ObjectKind].Properties[Property] or Property
+	return Object[PropertyToGet]
+end
+
+function Icons.ResolveProperties(ClassName: string, Properties: { [string]: any }): { [string]: any }
+	local Mapping = IconMappings[IconMappings.ClassKinds[ClassName]].Properties
+	local Resolved = {}
+
+	for Property, Value in Properties do
+		Resolved[Mapping[Property] or Property] = Value
+	end
+
+	return Resolved
+end
+
+function Icons.SetProperties(Object: Instance, Properties: { [string]: any })
+	for Key, Value in Icons.ResolveProperties(Object.ClassName, Properties) do
+		Object[Key] = Value
+	end
+end
+
+function Icons.GetSpriteIcon(IconName: string): SpriteIcon?
 	if not Success then
 		return
 	end
 
-	local Success, Icon = pcall(IconsModule.GetAsset, iconName)
-	if not Success then
+	local Fetched, Icon = pcall(Lucide.GetAsset, IconName)
+	if not Fetched then
 		return
 	end
 
 	return Icon
 end
 
-function Icons.SetIcon(imageInstance: ImageLabel, iconName: string)
-	local Icon: Icon? = Icons.GetIcon(iconName)
-	if not Icon then
+function Icons.SetIcon(Object: IconObject, Icon: string)
+	local IconKind = Icons.IconMappings.ClassKinds[Object.ClassName]
+	assert(IconKind, `{Object.ClassName} cannot display icon "{Icon}"`)
+
+	if IconKind == "Glyph" then
+		local Glyph = Object
+		Glyph.FontFace = FontFace :: Font
+		Glyph.RichText = false
+		Glyph.TextScaled = true
+		Glyph.Text = Icon
 		return
 	end
 
-	imageInstance.Image = Icon.Url
-	imageInstance.ImageRectOffset = Icon.ImageRectOffset
-	imageInstance.ImageRectSize = Icon.ImageRectSize
+	local Image = Object :: ImageLabel
+	if AssetManager.IsAsset(Icon) then
+		Image.Image = Icon
+		Image.ImageRectOffset = Vector2.zero
+		Image.ImageRectSize = Vector2.zero
+		return
+	end
+
+	local Sprite = Icons.GetSpriteIcon(Icon)
+	if not Sprite then
+		return
+	end
+
+	Image.Image = Sprite.Url
+	Image.ImageRectOffset = Sprite.ImageRectOffset
+	Image.ImageRectSize = Sprite.ImageRectSize
 end
 
 return Icons
 
 end)() end,
-    [118] = function()local wax,script,require=ImportGlobals(118)local ImportGlobals return (function(...)--// Imports \\--
+    [118] = function()local wax,script,require,CreateLookupTable=ImportGlobals(118)local ImportGlobals return (function(...)--// Imports \\--
 local Registry = require(script.Parent.Registry)
 local FileHelper = require("@src/Utils/FileHelper")
 
@@ -12541,7 +12676,7 @@ local AssetManager = {
 	Preloaded = false,
 }
 
-local Assets = FileHelper.new("RobloxPL/Assets")
+local Assets = FileHelper.new("Cobalt/Assets")
 
 local UsedRandomStrings = {}
 local AssetRandom = Random.new(tick())
@@ -12860,7 +12995,7 @@ local function GetCustomFontErrors(): { [string]: string }
 		end
 
 		local Params = Instance.new("GetTextBoundsParams")
-		Params.Text = "RobloxPL"
+		Params.Text = "Cobalt"
 		Params.RichText = true
 		Params.Font = AssetManager.GetCustomFont(Name)
 		Params.Size = 16
@@ -12923,10 +13058,29 @@ function AssetManager.GetInstanceClassImages(): { [string]: string }
 	return Images
 end
 
+local EditableClassNames = {
+	["EditableImage"] = true,
+	["EditableMesh"] = true,
+}
+
+function AssetManager.IsAsset(asset: string | EditableImage | EditableMesh)
+	if typeof(asset) == "string" then
+		return (
+			asset:match("^rbxasset") ~= nil or
+			asset:match("^rbxthumb") ~= nil or
+			asset:match("^https?://") ~= nil
+		)
+	elseif typeof(asset) == "Object" then
+		return EditableClassNames[asset.ClassName]
+	end
+
+	return false
+end
+
 return AssetManager
 
 end)() end,
-    [119] = function()local wax,script,require=ImportGlobals(119)local ImportGlobals return (function(...)export type FontAsset = {
+    [119] = function()local wax,script,require,CreateLookupTable=ImportGlobals(119)local ImportGlobals return (function(...)export type FontAsset = {
 	Type: "Font",
 	FileName: string,
 	FamilyName: string,
@@ -12944,7 +13098,7 @@ export type ImageAsset = {
 
 export type Asset = FontAsset | ImageAsset
 
-local RepositoryAssetUrl = "https://gitlab.com/upio/RobloxPL/-/raw/main/Assets"
+local RepositoryAssetUrl = "https://gitlab.com/upio/cobalt/-/raw/main/Assets"
 local RobloxClassIconUrl = "https://robloxapi.github.io/ref/icons/dark"
 
 local Registry: { [string]: Asset } = {
@@ -13023,7 +13177,7 @@ local Registry: { [string]: Asset } = {
 return Registry
 
 end)() end,
-    [120] = function()local wax,script,require=ImportGlobals(120)local ImportGlobals return (function(...)local Interface = {}
+    [120] = function()local wax,script,require,CreateLookupTable=ImportGlobals(120)local ImportGlobals return (function(...)local Interface = {}
 local Icons = require(script.Parent.Assets.Icons)
 local AssetManager = require(script.Parent.Assets.Manager)
 
@@ -13102,25 +13256,72 @@ function Interface.New(ClassName: string, Properties: { [string | number]: any }
 	return Object
 end
 
-function Interface.NewIcon(IconName: string, Properties: { [string]: any })
-	local Image: ImageLabel = Interface.New("ImageLabel", Properties)
-	Icons.SetIcon(Image, IconName)
+local function CreateIcon(Icon: string, Button: boolean, Properties: { [string]: any }?): Icons.IconObject
+	local ClassName = Icons.GetClassName(Icon, Button)
+	local Resolved = {
+		Name = "Icon",
+		BackgroundTransparency = 1,
+	}
 
-	return Image
+	for Key, Value in Icons.ResolveProperties(ClassName, Properties or {}) do
+		Resolved[Key] = Value
+	end
+
+	local Object = Interface.New(ClassName, Resolved)
+	Icons.SetIcon(Object, Icon)
+
+	return Object
 end
 
-function Interface.HideCorner(Frame: GuiObject, Size: UDim2, Offset: Vector2): Frame
-	local Hider = Interface.New("Frame", {
-		AnchorPoint = Offset or Vector2.zero,
-		BackgroundColor3 = Frame.BackgroundColor3,
-		Position = UDim2.fromScale(Offset.X or 0, Offset.Y or 0),
-		Size = Size,
-		ZIndex = Frame.ZIndex,
+function Interface.NewIcon(Icon: string, Properties: { [string]: any }?): Icons.IconObject
+	return CreateIcon(Icon, false, Properties)
+end
 
-		Parent = Frame,
-	})
+function Interface.NewIconButton(Icon: string, Properties: { [string]: any }?): Icons.IconObject
+	return CreateIcon(Icon, true, Properties)
+end
 
-	return Hider
+local CarriedIconProperties = {
+	"Name",
+	"AnchorPoint",
+	"Position",
+	"Size",
+	"SizeConstraint",
+	"AutomaticSize",
+	"LayoutOrder",
+	"ZIndex",
+	"Rotation",
+	"Visible",
+	"Active",
+	"BackgroundColor3",
+	"BackgroundTransparency",
+}
+
+function Interface.SetIcon(Object: Icons.IconObject, Icon: string): Icons.IconObject
+	if Icons.CanDisplay(Object, Icon) then
+		Icons.SetIcon(Object, Icon)
+		return Object
+	end
+
+	assert(not Object:IsA("GuiButton"), "Icon buttons cannot be replaced, use an icon inside of a button instead")
+
+	local Properties = {
+		IconColor3 = Icons.GetProperty(Object, "IconColor3"),
+		IconTransparency = Icons.GetProperty(Object, "IconTransparency"),
+	}
+	for _, Property in CarriedIconProperties do
+		Properties[Property] = (Object :: any)[Property]
+	end
+
+	local Replacement = Interface.NewIcon(Icon, Properties)
+	for _, Child in Object:GetChildren() do
+		Child.Parent = Replacement
+	end
+
+	Replacement.Parent = Object.Parent
+	Object:Destroy()
+
+	return Replacement
 end
 
 function Interface.GetScreenParent(): Instance
@@ -13142,7 +13343,7 @@ end
 return Interface
 
 end)() end,
-    [121] = function()local wax,script,require=ImportGlobals(121)local ImportGlobals return (function(...)--// Imports \\--
+    [121] = function()local wax,script,require,CreateLookupTable=ImportGlobals(121)local ImportGlobals return (function(...)--// Imports \\--
 local Schema = wax.shared.ValidationSchema or require(script.Schema)
 
 --// Module \\--
@@ -13171,7 +13372,7 @@ end
 return Validation
 
 end)() end,
-    [122] = function()local wax,script,require=ImportGlobals(122)local ImportGlobals return (function(...)--// Types \\--
+    [122] = function()local wax,script,require,CreateLookupTable=ImportGlobals(122)local ImportGlobals return (function(...)--// Types \\--
 type SchemaKind = "Any" | "Type" | "Literal" | "Enum" | "Array" | "Object" | "Union"
 type Refinement = {
 	Predicate: (any) -> boolean,
@@ -13493,7 +13694,7 @@ end
 return Schema
 
 end)() end,
-    [123] = function()local wax,script,require=ImportGlobals(123)local ImportGlobals return (function(...)--// Imports \\--
+    [123] = function()local wax,script,require,CreateLookupTable=ImportGlobals(123)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 
@@ -13514,7 +13715,7 @@ local Window = {
 }
 
 --// Assets \\--
-local RobloxPLLogo = AssetManager.GetImage("Logo")
+local CobaltLogo = AssetManager.GetImage("Logo")
 
 local DPIHandler
 local function GetDPIScale()
@@ -13523,7 +13724,7 @@ end
 
 --// UI \\--
 local ScreenGui = Interface.New("ScreenGui", {
-	Name = "RobloxPL",
+	Name = "Cobalt",
 	ResetOnSpawn = false,
 	Parent = Interface.GetScreenParent(),
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
@@ -13564,7 +13765,7 @@ local ShowButton = Interface.New("TextButton", {
 	["ImageLabel"] = {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
-		Image = RobloxPLLogo,
+		Image = CobaltLogo,
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.new(1, -10, 1, -10),
 	},
@@ -13692,7 +13893,7 @@ PluginManager.AttachWindow({
 require(script.Components.Topbar)({
 	MainFrame = MainFrame,
 	ShowButton = ShowButton,
-	RobloxPLLogo = RobloxPLLogo,
+	CobaltLogo = CobaltLogo,
 	Modals = Window.Modals,
 	GetDPIScale = GetDPIScale,
 })
@@ -13700,8 +13901,7 @@ require(script.Components.Topbar)({
 return Window
 
 end)() end,
-    [125] = function()local wax,script,require=ImportGlobals(125)local ImportGlobals return (function(...)local Interface = require("@src/Utils/UI/Interface")
-local Icons = require("@src/Utils/UI/Assets/Icons")
+    [125] = function()local wax,script,require,CreateLookupTable=ImportGlobals(125)local ImportGlobals return (function(...)local Interface = require("@src/Utils/UI/Interface")
 local Input = require("@src/Window/Utils/Input/Input")
 
 local ContextMenu = {}
@@ -13840,23 +14040,12 @@ function ContextMenu:Create(
 				IconToSet = IconToSet()
 			end
 
-			local ItemIcon
-			if tostring(IconToSet):match("rbxasset") then
-				ItemIcon = Interface.New("ImageLabel", {
-					Image = IconToSet,
-					Size = UDim2.fromScale(1, 1),
-					SizeConstraint = Enum.SizeConstraint.RelativeYY,
+			local ItemIcon = Interface.NewIcon(IconToSet or "", {
+				Size = UDim2.fromScale(1, 1),
+				SizeConstraint = Enum.SizeConstraint.RelativeYY,
 
-					Parent = TextButton,
-				})
-			else
-				ItemIcon = Interface.NewIcon(IconToSet, {
-					Size = UDim2.fromScale(1, 1),
-					SizeConstraint = Enum.SizeConstraint.RelativeYY,
-
-					Parent = TextButton,
-				})
-			end
+				Parent = TextButton,
+			})
 
 			local TextToSet = Data.Text
 			if typeof(TextToSet) == "function" then
@@ -13921,14 +14110,7 @@ function ContextMenu:Create(
 
 				if typeof(Data.Icon) == "function" then
 					IconToSet = Data.Icon()
-
-					if tostring(IconToSet):match("rbxasset") then
-						ItemIcon.ImageRectOffset = Vector2.new(0, 0)
-						ItemIcon.ImageRectSize = Vector2.new(0, 0)
-						ItemIcon.Image = IconToSet
-					else
-						Icons.SetIcon(ItemIcon, IconToSet)
-					end
+					ItemIcon = Interface.SetIcon(ItemIcon, IconToSet)
 				end
 
 				if Data.TextProperties then
@@ -14060,7 +14242,7 @@ end
 return ContextMenu
 
 end)() end,
-    [126] = function()local wax,script,require=ImportGlobals(126)local ImportGlobals return (function(...)--// Imports \\--
+    [126] = function()local wax,script,require,CreateLookupTable=ImportGlobals(126)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Icons = require("@src/Utils/UI/Assets/Icons")
 local Constants = require("@src/Window/Constants")
@@ -14172,16 +14354,13 @@ local function SetupDialog(
 	})
 
 	--// Close Button \\--
-	local CloseButton = Interface.New("ImageButton", {
-		ImageTransparency = 0.5,
+	local CloseButton = Interface.NewIconButton("x", {
+		IconTransparency = 0.5,
 		AnchorPoint = Vector2.new(1, 0),
 		Size = UDim2.new(0, 15, 0, 15),
 		Position = UDim2.new(1, 0, 0, 0),
 		Parent = Header,
 	})
-	do
-		Icons.SetIcon(CloseButton, "x")
-	end
 
 	--// Title Description \\--
 	local TitleDescriptionContainer = Interface.New("Frame", {
@@ -14217,6 +14396,7 @@ local function SetupDialog(
 	})
 
 	local HeaderIcon = Interface.New("ImageLabel", {
+		Name = "Icon",
 		Size = UDim2.new(0, 23, 0, 23),
 		Visible = false,
 
@@ -14320,17 +14500,13 @@ local function SetupDialog(
 			Parent = Button,
 		})
 
-		local Icon = Interface.New("ImageLabel", {
-			Visible = false,
+		local Icon = Interface.NewIcon(ButtonIcon or "", {
+			Visible = ButtonIcon ~= nil,
 			SizeConstraint = Enum.SizeConstraint.RelativeYY,
 			Size = UDim2.fromScale(1, 1),
 
 			Parent = Button,
 		})
-		if ButtonIcon then
-			Icons.SetIcon(Icon, ButtonIcon)
-			Icon.Visible = true
-		end
 
 		return Button, Text, Icon
 	end
@@ -14417,20 +14593,15 @@ return function(ComponentProps: {
 		--// Header \\--
 		self.Header.TitleLabel.Text = `<b>{props.Title}</b>`
 		self.Header.DescriptionLabel.Text = props.Description
-		if props.TitleColor then
-			self.Header.TitleLabel.TextColor3 = props.TitleColor
-			self.Header.HeaderIcon.ImageColor3 = props.TitleColor
-		end
-
 		if props.Icon then
-			if props.Icon:find("rbxasset") then
-				self.Header.HeaderIcon.Image = props.Icon
-			else
-				Icons.SetIcon(self.Header.HeaderIcon, props.Icon)
-			end
-
+			self.Header.HeaderIcon = Interface.SetIcon(self.Header.HeaderIcon, props.Icon)
 			self.Header.TitleLabel.Size = UDim2.new(1, -28, 0, 20)
 			self.Header.HeaderIcon.Visible = true
+		end
+
+		if props.TitleColor then
+			self.Header.TitleLabel.TextColor3 = props.TitleColor
+			Icons.SetProperties(self.Header.HeaderIcon, { IconColor3 = props.TitleColor })
 		end
 
 		--// Footer \\--
@@ -14494,7 +14665,7 @@ return function(ComponentProps: {
 				Button.Interactable = not Disabled
 				Button.BackgroundTransparency = if Disabled then 0.45 else 0
 				Text.TextTransparency = if Disabled then 0.5 else 0
-				Icon.ImageTransparency = if Disabled then 0.5 else 0
+				Icons.SetProperties(Icon, { IconTransparency = if Disabled then 0.5 else 0 })
 
 				if Disabled then
 					CancelHold()
@@ -14690,7 +14861,7 @@ return function(ComponentProps: {
 end
 
 end)() end,
-    [127] = function()local wax,script,require=ImportGlobals(127)local ImportGlobals return (function(...)local Registry = {}
+    [127] = function()local wax,script,require,CreateLookupTable=ImportGlobals(127)local ImportGlobals return (function(...)local Registry = {}
 
 for _, Dialog in script:GetChildren() do
 	Registry[Dialog.Name] = require(Dialog)
@@ -14698,7 +14869,7 @@ end
 
 return Registry
 end)() end,
-    [128] = function()local wax,script,require=ImportGlobals(128)local ImportGlobals return (function(...)--// Imports \\--
+    [128] = function()local wax,script,require,CreateLookupTable=ImportGlobals(128)local ImportGlobals return (function(...)--// Imports \\--
 local Types = require("@src/Window/Types")
 local Validation = require("@src/Utils/Validation")
 local CallFilterSchema = require("@src/Utils/CallFilter/Schema")
@@ -14774,7 +14945,7 @@ function CallFilter.Open(Window: Window, Options: CallFilterDialogOptions)
 	local Query: QueryBuilder
 	local Dialog = Window.Dialog.new({
 		Title = Existing and "Edit Call Filter" or "Create Call Filter",
-		Description = "Choose which remote calls RobloxPL should match.",
+		Description = "Choose which remote calls Cobalt should match.",
 		Icon = "list-filter",
 		AutoShow = false,
 		Footer = {
@@ -14820,7 +14991,7 @@ end
 return CallFilter
 
 end)() end,
-    [129] = function()local wax,script,require=ImportGlobals(129)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
+    [129] = function()local wax,script,require,CreateLookupTable=ImportGlobals(129)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
 
 local ClearCapturedCalls = {}
 
@@ -14850,7 +15021,7 @@ end
 return ClearCapturedCalls
 
 end)() end,
-    [130] = function()local wax,script,require=ImportGlobals(130)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
+    [130] = function()local wax,script,require,CreateLookupTable=ImportGlobals(130)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
 
 local Credits = {}
 
@@ -14858,8 +15029,8 @@ function Credits.Open(Window: Types.Window)
 	return Window.Dialog.new({
 		Title = "Credits",
 		Description = table.concat({
-			"<b>upio</b> · RobloxPL Developer",
-			"<b>deivid</b> · RobloxPL Developer",
+			"<b>upio</b> · Cobalt Developer",
+			"<b>deivid</b> · Cobalt Developer",
 			'<b>shadcn</b> · UI design inspiration · <font color="#3798ff">ui.shadcn.com</font>',
 			'<b>The Lucide Team</b> · Icon library · <font color="#3798ff">lucide.dev</font>',
 			'<b>Emil Kowalski</b> · Sonner · <font color="#3798ff">sonner.emilkowal.ski</font>',
@@ -14876,7 +15047,7 @@ end
 return Credits
 
 end)() end,
-    [131] = function()local wax,script,require=ImportGlobals(131)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
+    [131] = function()local wax,script,require,CreateLookupTable=ImportGlobals(131)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
 
 local DeleteCallFilter = {}
 
@@ -14902,7 +15073,7 @@ end
 return DeleteCallFilter
 
 end)() end,
-    [132] = function()local wax,script,require=ImportGlobals(132)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
+    [132] = function()local wax,script,require,CreateLookupTable=ImportGlobals(132)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
 
 local DetectionRisk = {}
 
@@ -14920,7 +15091,7 @@ function DetectionRisk.Open(Window: Types.Window, Failures: { string })
 	return Window.Dialog.new({
 		Title = "Detection Risk",
 		TitleColor = Color3.fromRGB(245, 60, 54),
-		Description = "RobloxPL may be detectable because your executor does not support the following functions or libraries:\n\n"
+		Description = "Cobalt may be detectable because your executor does not support the following functions or libraries:\n\n"
 			.. table.concat(Details, "\n\n"),
 		Icon = "triangle-alert",
 		Footer = {
@@ -14935,7 +15106,7 @@ end
 return DetectionRisk
 
 end)() end,
-    [133] = function()local wax,script,require=ImportGlobals(133)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
+    [133] = function()local wax,script,require,CreateLookupTable=ImportGlobals(133)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
 
 local LoggingDisabled = {}
 
@@ -14943,7 +15114,7 @@ function LoggingDisabled.Open(Window: Types.Window)
 	return Window.Dialog.new({
 		Title = "Limited Logging Support",
 		TitleColor = Color3.fromRGB(245, 166, 35),
-		Description = "Your executor can't fully support RobloxPL's remote logging. Incoming RemoteEvents will still be captured with limited info; outgoing calls and incoming RemoteFunctions won't be logged on this executor.",
+		Description = "Your executor can't fully support Cobalt's remote logging. Incoming RemoteEvents will still be captured with limited info; outgoing calls and incoming RemoteFunctions won't be logged on this executor.",
 		Icon = "triangle-alert",
 		Footer = {
 			{
@@ -14963,7 +15134,7 @@ end
 return LoggingDisabled
 
 end)() end,
-    [134] = function()local wax,script,require=ImportGlobals(134)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
+    [134] = function()local wax,script,require,CreateLookupTable=ImportGlobals(134)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
 
 local Oth = {}
 
@@ -14978,7 +15149,7 @@ function Oth.Confirm(Window: Types.Window, NewValue: boolean): boolean
         local Thread = coroutine.running()
         task.spawn(Window.Dialog.new, {
             Title = "Warning",
-            Description = "Are you sure you want to disable Oth hooks? This is risky and could theoretically lead to getting banned in certain games. RobloxPL is not responsible for any bans you may receive. This change takes effect the next time RobloxPL launches.",
+            Description = "Are you sure you want to disable Oth hooks? This is risky and could theoretically lead to getting banned in certain games. Cobalt is not responsible for any bans you may receive. This change takes effect the next time Cobalt launches.",
             Icon = "triangle-alert",
             AutoShow = true,
             Footer = {
@@ -15009,7 +15180,7 @@ end
 
 return Oth
 end)() end,
-    [135] = function()local wax,script,require=ImportGlobals(135)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
+    [135] = function()local wax,script,require,CreateLookupTable=ImportGlobals(135)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
 
 local RakNet = {}
 
@@ -15023,7 +15194,7 @@ function RakNet.ConfirmEnable(Window: Types.Window): boolean
 	local Thread = coroutine.running()
 	task.spawn(Window.Dialog.new, {
 		Title = "Warning",
-		Description = "Are you sure you want to use RakNet hooks? This is risky and could theoretically lead to account bans. RobloxPL is not responsible for any bans you may receive. This change takes effect the next time RobloxPL launches.",
+		Description = "Are you sure you want to use RakNet hooks? This is risky and could theoretically lead to account bans. Cobalt is not responsible for any bans you may receive. This change takes effect the next time Cobalt launches.",
 		Icon = "triangle-alert",
 		AutoShow = true,
 		Footer = {
@@ -15052,7 +15223,8 @@ end
 return RakNet
 
 end)() end,
-    [136] = function()local wax,script,require=ImportGlobals(136)local ImportGlobals return (function(...)local Interface = require("@src/Utils/UI/Interface")
+    [136] = function()local wax,script,require,CreateLookupTable=ImportGlobals(136)local ImportGlobals return (function(...)local Icons = require("@src/Utils/UI/Assets/Icons")
+local Interface = require("@src/Utils/UI/Interface")
 
 local Modal = {}
 Modal.__index = Modal
@@ -15118,17 +15290,25 @@ end
 function Modal:ConnectCloseButton(Button, Image)
 	Button.MouseEnter:Connect(function()
 		wax.shared.TweenService
-			:Create(Image, self.TweenInfo, {
-				ImageTransparency = 0.25,
-			})
+			:Create(
+				Image,
+				self.TweenInfo,
+				Icons.ResolveProperties(Image.ClassName, {
+					IconTransparency = 0.25,
+				})
+			)
 			:Play()
 	end)
 
 	Button.MouseLeave:Connect(function()
 		wax.shared.TweenService
-			:Create(Image, self.TweenInfo, {
-				ImageTransparency = 0.5,
-			})
+			:Create(
+				Image,
+				self.TweenInfo,
+				Icons.ResolveProperties(Image.ClassName, {
+					IconTransparency = 0.5,
+				})
+			)
 			:Play()
 	end)
 
@@ -15161,26 +15341,14 @@ function Modal:CreateTop(Title: string, Icon: string, Parent: GuiObject)
 		Parent = ModalTop,
 	})
 
-	local ModalIcon
-	if Icon:match("rbxasset") then
-		ModalIcon = Interface.New("ImageLabel", {
-			Image = Icon,
-			Size = UDim2.fromScale(1, 1),
-			Position = UDim2.fromOffset(4, 0),
-			SizeConstraint = Enum.SizeConstraint.RelativeYY,
+	local ModalIcon = Interface.NewIcon(Icon, {
+		IconTransparency = if Icons.GetIconData(Icon) == "Image" then 0 else 0.5,
+		Size = UDim2.fromScale(1, 1),
+		Position = UDim2.fromOffset(4, 0),
+		SizeConstraint = Enum.SizeConstraint.RelativeYY,
 
-			Parent = ModalTop,
-		})
-	else
-		ModalIcon = Interface.NewIcon(Icon, {
-			ImageTransparency = 0.5,
-			Size = UDim2.fromScale(1, 1),
-			Position = UDim2.fromOffset(4, 0),
-			SizeConstraint = Enum.SizeConstraint.RelativeYY,
-
-			Parent = ModalTop,
-		})
-	end
+		Parent = ModalTop,
+	})
 
 	local CloseButton = Interface.New("ImageButton", {
 		Size = UDim2.fromScale(1, 1),
@@ -15191,7 +15359,7 @@ function Modal:CreateTop(Title: string, Icon: string, Parent: GuiObject)
 	})
 
 	local CloseImage = Interface.NewIcon("x", {
-		ImageTransparency = 0.5,
+		IconTransparency = 0.5,
 		Size = UDim2.fromOffset(22, 22),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -15215,8 +15383,7 @@ end
 return Modal
 
 end)() end,
-    [139] = function()local wax,script,require=ImportGlobals(139)local ImportGlobals return (function(...)local Interface = require("@src/Utils/UI/Interface")
-local Icons = require("@src/Utils/UI/Assets/Icons")
+    [139] = function()local wax,script,require,CreateLookupTable=ImportGlobals(139)local ImportGlobals return (function(...)local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 local Types = require("@src/Window/Types")
 local Operators = require("@src/Utils/CallFilter/Operators")
@@ -15382,16 +15549,12 @@ return function(Props: {
 		})
 		table.insert(Rows, Row)
 
-		local TargetIcon = Interface.New("ImageLabel", {
+		Interface.NewIcon(if Filter.Target.Type == "Query" then "globe" else TargetImage or "", {
 			AnchorPoint = Vector2.new(0, 0.5),
-			Image = TargetImage or "",
 			Position = UDim2.new(0, 8, 0.5, 0),
 			Size = UDim2.fromOffset(26, 26),
 			Parent = Row,
 		})
-		if Filter.Target.Type == "Query" then
-			Icons.SetIcon(TargetIcon, "globe")
-		end
 		local Header = Interface.New("Frame", {
 			BackgroundTransparency = 1,
 			Position = UDim2.fromOffset(42, 5),
@@ -15442,15 +15605,13 @@ return function(Props: {
 
 		CreateToggle(Row, Filter)
 
-		local MoreButton = Interface.New("ImageButton", {
+		local MoreButton = Interface.NewIconButton("ellipsis", {
 			AnchorPoint = Vector2.new(1, 0.5),
-			BackgroundTransparency = 1,
-			ImageTransparency = 0.5,
+			IconTransparency = 0.5,
 			Position = UDim2.new(1, -8, 0.5, 0),
 			Size = UDim2.fromOffset(22, 22),
 			Parent = Row,
 		})
-		Icons.SetIcon(MoreButton, "ellipsis")
 		local Menu = Props.ContextMenu:Create(MoreButton, {
 			{
 				Text = "Edit",
@@ -15503,7 +15664,7 @@ return function(Props: {
 end
 
 end)() end,
-    [140] = function()local wax,script,require=ImportGlobals(140)local ImportGlobals return (function(...)--// Imports \\--
+    [140] = function()local wax,script,require,CreateLookupTable=ImportGlobals(140)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 
@@ -15632,28 +15793,12 @@ return function(props: {
 end
 
 end)() end,
-    [141] = function()local wax,script,require=ImportGlobals(141)local ImportGlobals return (function(...)--// Imports \\--
+    [141] = function()local wax,script,require,CreateLookupTable=ImportGlobals(141)local ImportGlobals return (function(...)--// Imports \\--
+local Icons = require("@src/Utils/UI/Assets/Icons")
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 
 local SettingSync = require(script.Parent.SettingSync)
-
-local function CreateLookupTable(Values: { any } | any)
-	if typeof(Values) ~= "table" then
-		return Values
-	end
-
-	local LookupTable = {}
-	for Key, Value in Values do
-		if type(Key) == "number" then
-			LookupTable[Value] = true
-		else
-			LookupTable[Key] = Value
-		end
-	end
-
-	return LookupTable
-end
 
 local function CloneDictionary(Source: { [any]: any })
 	local Copy = {}
@@ -15747,7 +15892,7 @@ return function(props: {
 
 	local DropdownIcon = Interface.NewIcon("chevron-down", {
 		AnchorPoint = Vector2.new(1, 0.5),
-		ImageTransparency = 0.2,
+		IconTransparency = 0.2,
 		Position = UDim2.new(1, 0, 0.5, 0),
 		Size = UDim2.fromOffset(12, 12),
 		Parent = DropdownDisplay,
@@ -15765,9 +15910,13 @@ return function(props: {
 
 		if TargetTransparency then
 			wax.shared.TweenService
-				:Create(DropdownIcon, Constants.DefaultTweenInfo, {
-					ImageTransparency = TargetTransparency,
-				})
+				:Create(
+					DropdownIcon,
+					Constants.DefaultTweenInfo,
+					Icons.ResolveProperties(DropdownIcon.ClassName, {
+						IconTransparency = TargetTransparency,
+					})
+				)
 				:Play()
 		end
 	end
@@ -15915,7 +16064,7 @@ return function(props: {
 end
 
 end)() end,
-    [142] = function()local wax,script,require=ImportGlobals(142)local ImportGlobals return (function(...)--// Imports \\--
+    [142] = function()local wax,script,require,CreateLookupTable=ImportGlobals(142)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Icons = require("@src/Utils/UI/Assets/Icons")
 local Constants = require("@src/Window/Constants")
@@ -16051,31 +16200,36 @@ return function(props: {
 			},
 		})
 
-		local RemoveButton = Interface.New("ImageButton", {
-			BackgroundTransparency = 1,
+		local RemoveButton = Interface.NewIconButton("trash", {
 			AnchorPoint = Vector2.new(1, 0.5),
 			Position = UDim2.new(1, -8, 0.5, 0),
 			Size = UDim2.new(1, -12, 1, -12),
 			SizeConstraint = Enum.SizeConstraint.RelativeYY,
-			ImageTransparency = 0.5,
+			IconTransparency = 0.5,
 			Parent = ListElement,
 		})
 
-		Icons.SetIcon(RemoveButton, "trash")
-
 		RemoveButton.MouseEnter:Connect(function()
 			wax.shared.TweenService
-				:Create(RemoveButton, Constants.DefaultTweenInfo, {
-					ImageTransparency = 0,
-				})
+				:Create(
+					RemoveButton,
+					Constants.DefaultTweenInfo,
+					Icons.ResolveProperties(RemoveButton.ClassName, {
+						IconTransparency = 0,
+					})
+				)
 				:Play()
 		end)
 
 		RemoveButton.MouseLeave:Connect(function()
 			wax.shared.TweenService
-				:Create(RemoveButton, Constants.DefaultTweenInfo, {
-					ImageTransparency = 0.5,
-				})
+				:Create(
+					RemoveButton,
+					Constants.DefaultTweenInfo,
+					Icons.ResolveProperties(RemoveButton.ClassName, {
+						IconTransparency = 0.5,
+					})
+				)
 				:Play()
 		end)
 
@@ -16149,7 +16303,7 @@ return function(props: {
 end
 
 end)() end,
-    [143] = function()local wax,script,require=ImportGlobals(143)local ImportGlobals return (function(...)local SettingSync = {}
+    [143] = function()local wax,script,require,CreateLookupTable=ImportGlobals(143)local ImportGlobals return (function(...)local SettingSync = {}
 
 function SettingSync.Broadcast(Idx: string, Value: any)
 	if not wax.shared.ActorCommunicator then
@@ -16179,7 +16333,7 @@ end
 return SettingSync
 
 end)() end,
-    [144] = function()local wax,script,require=ImportGlobals(144)local ImportGlobals return (function(...)--// Imports \\--
+    [144] = function()local wax,script,require,CreateLookupTable=ImportGlobals(144)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 
 local SettingSync = require(script.Parent.SettingSync)
@@ -16348,7 +16502,7 @@ return function(props: {
 end
 
 end)() end,
-    [145] = function()local wax,script,require=ImportGlobals(145)local ImportGlobals return (function(...)--// Imports \\--
+    [145] = function()local wax,script,require,CreateLookupTable=ImportGlobals(145)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 
 local ContextMenuController = require("@src/Window/Components/ContextMenu")
@@ -16500,7 +16654,7 @@ return function(props: {
 end
 
 end)() end,
-    [146] = function()local wax,script,require=ImportGlobals(146)local ImportGlobals return (function(...)--// Imports \\--
+    [146] = function()local wax,script,require,CreateLookupTable=ImportGlobals(146)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local SectionBuilder = require(script.Parent.Section)
 
@@ -16559,7 +16713,7 @@ return function(props: {
 end
 
 end)() end,
-    [147] = function()local wax,script,require=ImportGlobals(147)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
+    [147] = function()local wax,script,require,CreateLookupTable=ImportGlobals(147)local ImportGlobals return (function(...)local Types = require("@src/Window/Types")
 local UI = require("@src/Window/Components/QueryBuilder/UI")
 local Operators = require("@src/Utils/CallFilter/Operators")
 
@@ -16579,9 +16733,8 @@ end
 return QueryBuilderClass
 
 end)() end,
-    [148] = function()local wax,script,require=ImportGlobals(148)local ImportGlobals return (function(...)--// Imports \\--
+    [148] = function()local wax,script,require,CreateLookupTable=ImportGlobals(148)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
-local Icons = require("@src/Utils/UI/Assets/Icons")
 local Constants = require("@src/Window/Constants")
 local Types = require("@src/Window/Types")
 local RemoteFields = require("@src/Utils/CallFilter/RemoteFields")
@@ -16866,6 +17019,7 @@ local function CreateSelect(props: {
 		Parent = Container,
 	})
 	local SelectedIcon = Interface.New("ImageLabel", {
+		Name = "Icon",
 		LayoutOrder = -1,
 		Size = UDim2.fromOffset(15, 15),
 		Visible = false,
@@ -16873,7 +17027,7 @@ local function CreateSelect(props: {
 	})
 
 	Interface.NewIcon("chevron-down", {
-		ImageTransparency = 0.5,
+		IconTransparency = 0.5,
 		LayoutOrder = 1,
 		Size = UDim2.fromOffset(15, 15),
 		Parent = Container,
@@ -16899,15 +17053,11 @@ local function CreateSelect(props: {
 		local Option = FindOption(Value)
 		local Text = Option and Option.Text or tostring(Value)
 		Label.Text = if props.Text then props.Text(Value, Text) else Text
-		SelectedIcon.Visible = Option ~= nil and Option.Icon ~= nil
-		if SelectedIcon.Visible then
-			SelectedIcon.ImageRectOffset = Vector2.zero
-			SelectedIcon.ImageRectSize = Vector2.zero
-			if tostring(Option.Icon):match("rbxasset") then
-				SelectedIcon.Image = Option.Icon
-			else
-				Icons.SetIcon(SelectedIcon, Option.Icon)
-			end
+		if Option ~= nil and Option.Icon ~= nil then
+			SelectedIcon = Interface.SetIcon(SelectedIcon, Option.Icon)
+			SelectedIcon.Visible = true
+		else
+			SelectedIcon.Visible = false
 		end
 		if Context then
 			Context:Close()
@@ -17238,7 +17388,7 @@ function UI.new(Dialog: Dialog, props: QueryBuilderProps, ContextMenu: any, Oper
 	})
 	Interface.NewIcon("plus", {
 		AnchorPoint = Vector2.new(0, 0.5),
-		ImageTransparency = 0.5,
+		IconTransparency = 0.5,
 		Position = UDim2.new(0, -17, 0.5, 0),
 		Size = UDim2.fromOffset(14, 14),
 		Parent = TargetAddCondition,
@@ -17364,12 +17514,11 @@ function UI.new(Dialog: Dialog, props: QueryBuilderProps, ContextMenu: any, Oper
 				VerticalAlignment = Enum.VerticalAlignment.Center,
 			},
 		})
-		local Remove = Interface.New("ImageButton", {
-			ImageTransparency = 0.5,
+		local Remove = Interface.NewIconButton("x", {
+			IconTransparency = 0.5,
 			Size = UDim2.fromOffset(14, 14),
 			Parent = RemoveContainer,
 		})
-		Icons.SetIcon(Remove, "x")
 		local CanRemove = Builder.Target.Type == "Query" and #Builder.Target.Conditions > 1
 		RemoveContainer.Visible = CanRemove
 		RemoveSeparator.Visible = CanRemove
@@ -17554,7 +17703,7 @@ function UI.new(Dialog: Dialog, props: QueryBuilderProps, ContextMenu: any, Oper
 		})
 		local ValueChevron = Interface.NewIcon("chevron-down", {
 			Active = true,
-			ImageTransparency = 0.5,
+			IconTransparency = 0.5,
 			LayoutOrder = 1,
 			Size = UDim2.fromOffset(12, 12),
 			Parent = ValueContainer,
@@ -17669,12 +17818,11 @@ function UI.new(Dialog: Dialog, props: QueryBuilderProps, ContextMenu: any, Oper
 				VerticalAlignment = Enum.VerticalAlignment.Center,
 			},
 		})
-		local Remove = Interface.New("ImageButton", {
-			ImageTransparency = 0.5,
+		local Remove = Interface.NewIconButton("x", {
+			IconTransparency = 0.5,
 			Size = UDim2.fromOffset(14, 14),
 			Parent = RemoveContainer,
 		})
-			Icons.SetIcon(Remove, "x")
 
 		local RowData = {
 			Row = Row,
@@ -17729,7 +17877,7 @@ function UI.new(Dialog: Dialog, props: QueryBuilderProps, ContextMenu: any, Oper
 	})
 	Interface.NewIcon("plus", {
 		AnchorPoint = Vector2.new(0, 0.5),
-		ImageTransparency = 0.5,
+		IconTransparency = 0.5,
 		Position = UDim2.new(0, -17, 0.5, 0),
 		Size = UDim2.fromOffset(14, 14),
 		Parent = AddCondition,
@@ -17804,7 +17952,7 @@ end
 return UI
 
 end)() end,
-    [149] = function()local wax,script,require=ImportGlobals(149)local ImportGlobals return (function(...)--[[[
+    [149] = function()local wax,script,require,CreateLookupTable=ImportGlobals(149)local ImportGlobals return (function(...)--[[[
 
 Sonner Luau Port by upio
 Original Sonner by Emil Kowalski (https://sonner.emilkowal.ski/)
@@ -17863,32 +18011,29 @@ local function InternalCreateNotificationObject(zindex, image, text)
 		},
 	})
 
-	local ImageLabel = Interface.New("ImageLabel", {
+	local Icon = Interface.NewIcon(image or "", {
 		SizeConstraint = Enum.SizeConstraint.RelativeYY,
-		ScaleType = Enum.ScaleType.Fit,
 		Size = UDim2.new(0, 20, 0, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0, 20, 0.5, 0),
 		BorderSizePixel = 0,
 		BackgroundTransparency = 1,
+		Visible = image ~= nil,
 		ZIndex = zindex + 1,
 		Parent = NotificationTemplate,
 	})
-
-	Animations.SetFadeExpectation("In", ImageLabel, {
-		BackgroundTransparency = 1,
-		ImageTransparency = 0,
-	})
-
-	if image then
-		if image:find("rbxasset") then
-			ImageLabel.Image = image
-		else
-			Icons.SetIcon(ImageLabel, image)
-		end
-	else
-		ImageLabel.Visible = false
+	if Icon:IsA("ImageLabel") then
+		Icon.ScaleType = Enum.ScaleType.Fit
 	end
+
+	Animations.SetFadeExpectation(
+		"In",
+		Icon,
+		Icons.ResolveProperties(Icon.ClassName, {
+			BackgroundTransparency = 1,
+			IconTransparency = 0,
+		})
+	)
 
 	local Frame = Interface.New("Frame", {
 		BorderSizePixel = 0,
@@ -18079,7 +18224,7 @@ function Sonner.promise(func, options)
 			repeat
 				wax.shared.RunService.RenderStepped:Wait()
 
-				local icon = notif:FindFirstChild("ImageLabel")
+				local icon = notif:FindFirstChild("Icon")
 				if not icon then
 					continue
 				end
@@ -18097,9 +18242,9 @@ function Sonner.promise(func, options)
 			-- The thread identity is 8 when setting it on the parent thread (Sonner.promise), but it still lacks capabilities when running another child thread
 			-- Capabilities here should pass from a thread to another... Could be an upstream (executor) issue ?
 
-			Animations.FadeOut(notif.ImageLabel, 0.15)
+			Animations.FadeOut(notif.Icon, 0.15)
 			wax.shared.TweenService
-				:Create(notif.ImageLabel, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
+				:Create(notif.Icon, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
 					Size = UDim2.new(0, 0, 0, 0),
 				})
 				:Play()
@@ -18108,10 +18253,10 @@ function Sonner.promise(func, options)
 			if coroutine.status(spinnerThread) ~= "dead" then
 				coroutine.close(spinnerThread)
 			end
-			notif.ImageLabel.Rotation = 0
+			notif.Icon.Rotation = 0
 
 			if success then
-				Icons.SetIcon(notif.ImageLabel, "check")
+				Icons.SetIcon(notif.Icon, "check")
 				local message = (
 					typeof(successText) == "string" and successText
 					or typeof(successText) == "function" and successText(resultOrError)
@@ -18124,7 +18269,7 @@ function Sonner.promise(func, options)
 					notif.Frame.TextLabel.Text = message
 				end
 			else
-				Icons.SetIcon(notif.ImageLabel, "circle-alert")
+				Icons.SetIcon(notif.Icon, "circle-alert")
 				notif.Frame.TextLabel.Text = (
 					typeof(errorText) == "string" and errorText
 					or typeof(errorText) == "function" and errorText(resultOrError)
@@ -18132,9 +18277,9 @@ function Sonner.promise(func, options)
 				)
 			end
 
-			Animations.FadeIn(notif.ImageLabel)
+			Animations.FadeIn(notif.Icon)
 			wax.shared.TweenService
-				:Create(notif.ImageLabel, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
+				:Create(notif.Icon, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
 					Size = UDim2.new(0, 20, 0, 20),
 				})
 				:Play()
@@ -18175,7 +18320,8 @@ end
 return Sonner
 
 end)() end,
-    [150] = function()local wax,script,require=ImportGlobals(150)local ImportGlobals return (function(...)--// Imports \\--
+    [150] = function()local wax,script,require,CreateLookupTable=ImportGlobals(150)local ImportGlobals return (function(...)--// Imports \\--
+local Icons = require("@src/Utils/UI/Assets/Icons")
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 local Drag = require("@src/Window/Utils/Input/Drag")
@@ -18185,7 +18331,7 @@ local ModalController = require("@src/Window/Components/Modal")
 return function(props: {
 	MainFrame: Frame,
 	ShowButton: TextButton,
-	RobloxPLLogo: string,
+	CobaltLogo: string,
 	Modals: {
 		Controller: ModalController.Modal,
 		[string]: any,
@@ -18202,11 +18348,10 @@ return function(props: {
 		BackgroundColor3 = Color3.fromRGB(25, 25, 25),
 		Size = UDim2.new(1, 0, 0, 36),
 		ZIndex = 0,
-		Constants.MainUICorner,
 		Parent = MainFrame,
 
 		["TextLabel"] = {
-			Text = "RobloxPL",
+			Text = "Cobalt",
 			TextSize = 18,
 			Position = UDim2.fromOffset(0, 1),
 			Size = UDim2.new(1, 0, 1, -1),
@@ -18217,10 +18362,16 @@ return function(props: {
 			Position = UDim2.new(0, 6, 0.5, 0),
 			Size = UDim2.new(1, -12, 1, -12),
 			SizeConstraint = Enum.SizeConstraint.RelativeYY,
-			Image = props.RobloxPLLogo,
+			Image = props.CobaltLogo,
+		},
+
+		["UICorner"] = {
+			TopLeftRadius = UDim.new(0, 6),
+			TopRightRadius = UDim.new(0, 6),
+			BottomLeftRadius = UDim.new(0, 0),
+			BottomRightRadius = UDim.new(0, 0),
 		},
 	})
-	Interface.HideCorner(TopBar, UDim2.fromScale(1, 0.5), Vector2.yAxis)
 
 	local TopButtons = Interface.New("Frame", {
 		BackgroundTransparency = 1,
@@ -18260,7 +18411,7 @@ return function(props: {
 		})
 
 		local Image = Interface.NewIcon(IconName, {
-			ImageTransparency = 0.5,
+			IconTransparency = 0.5,
 			Size = UDim2.fromScale(1, 1),
 			SizeConstraint = Enum.SizeConstraint.RelativeYY,
 
@@ -18269,17 +18420,25 @@ return function(props: {
 
 		Button.MouseEnter:Connect(function()
 			wax.shared.TweenService
-				:Create(Image, Constants.DefaultTweenInfo, {
-					ImageTransparency = 0.25,
-				})
+				:Create(
+					Image,
+					Constants.DefaultTweenInfo,
+					Icons.ResolveProperties(Image.ClassName, {
+						IconTransparency = 0.25,
+					})
+				)
 				:Play()
 		end)
 
 		Button.MouseLeave:Connect(function()
 			wax.shared.TweenService
-				:Create(Image, Constants.DefaultTweenInfo, {
-					ImageTransparency = 0.5,
-				})
+				:Create(
+					Image,
+					Constants.DefaultTweenInfo,
+					Icons.ResolveProperties(Image.ClassName, {
+						IconTransparency = 0.5,
+					})
+				)
 				:Play()
 		end)
 
@@ -18390,7 +18549,7 @@ return function(props: {
 end
 
 end)() end,
-    [151] = function()local wax,script,require=ImportGlobals(151)local ImportGlobals return (function(...)--// Imports \\--
+    [151] = function()local wax,script,require,CreateLookupTable=ImportGlobals(151)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local AssetManager = require("@src/Utils/UI/Assets/Manager")
 
@@ -18408,7 +18567,7 @@ Constants.InstanceClassImages = AssetManager.GetInstanceClassImages()
 return Constants
 
 end)() end,
-    [153] = function()local wax,script,require=ImportGlobals(153)local ImportGlobals return (function(...)--// Imports \\--
+    [153] = function()local wax,script,require,CreateLookupTable=ImportGlobals(153)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 local Types = require("@src/Window/Types")
@@ -18522,8 +18681,8 @@ return function(props: {
 	--// Functions \\--
 	function Modal:Open(CallInfo)
 		--// Plugin Hooks \\--
-		if wax.shared.RobloxPLPluginManager and wax.shared.RobloxPLPluginManager.Initialized then
-			for _, Interceptor in wax.shared.RobloxPLPluginManager.Registry.UIHooks.RemoteInfo.Intercept do
+		if wax.shared.CobaltPluginManager and wax.shared.CobaltPluginManager.Initialized then
+			for _, Interceptor in wax.shared.CobaltPluginManager.Registry.UIHooks.RemoteInfo.Intercept do
 				local Success, Result = pcall(Interceptor, CallInfo)
 
 				if Success and Result == false then
@@ -18536,7 +18695,7 @@ return function(props: {
 
 		--// Set Title \\--
 		Modal.Title.Text = if CallInfo.Blocked then `{Event.Name} (Blocked)` else Event.Name
-		Modal.Icon.Image = Constants.InstanceClassImages[Event.ClassName]
+		Modal.Icon = Interface.SetIcon(Modal.Icon, Constants.InstanceClassImages[Event.ClassName])
 
 		--// Set Current Info \\--
 		Modal.CurrentInfo = CallInfo
@@ -18575,8 +18734,8 @@ return function(props: {
 		end
 
 		--// Plugin Hooks \\--
-		if wax.shared.RobloxPLPluginManager and wax.shared.RobloxPLPluginManager.Initialized then
-			for _, Plugin in wax.shared.RobloxPLPluginManager.Registry.UIHooks.RemoteInfo.Open do
+		if wax.shared.CobaltPluginManager and wax.shared.CobaltPluginManager.Initialized then
+			for _, Plugin in wax.shared.CobaltPluginManager.Registry.UIHooks.RemoteInfo.Open do
 				task.spawn(Plugin, CallInfo)
 			end
 		end
@@ -18595,7 +18754,7 @@ return function(props: {
 end
 
 end)() end,
-    [155] = function()local wax,script,require=ImportGlobals(155)local ImportGlobals return (function(...)--// Imports \\--
+    [155] = function()local wax,script,require,CreateLookupTable=ImportGlobals(155)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 
 local LazySerializer = require("@src/Window/Utils/Text/LazySerializer")
@@ -18757,7 +18916,7 @@ end
 return ArgumentList
 
 end)() end,
-    [156] = function()local wax,script,require=ImportGlobals(156)local ImportGlobals return (function(...)--// Imports \\--
+    [156] = function()local wax,script,require,CreateLookupTable=ImportGlobals(156)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local AssetManager = require("@src/Utils/UI/Assets/Manager")
 
@@ -18838,7 +18997,7 @@ end
 return CodeView
 
 end)() end,
-    [157] = function()local wax,script,require=ImportGlobals(157)local ImportGlobals return (function(...)local CodeGen = require("@src/Utils/CodeGen/Generator")
+    [157] = function()local wax,script,require,CreateLookupTable=ImportGlobals(157)local ImportGlobals return (function(...)local CodeGen = require("@src/Utils/CodeGen/Generator")
 local Types = require("@src/Window/Types")
 local ModalController = require("@src/Window/Components/Modal")
 local InstanceSerializer = require("@src/Utils/CodeGen/Serializer/Instance")
@@ -19134,7 +19293,7 @@ return function(props: {
 end
 
 end)() end,
-    [158] = function()local wax,script,require=ImportGlobals(158)local ImportGlobals return (function(...)--// Imports \\--
+    [158] = function()local wax,script,require,CreateLookupTable=ImportGlobals(158)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local AssetManager = require("@src/Utils/UI/Assets/Manager")
 
@@ -19176,7 +19335,7 @@ end
 return FunctionInfoView
 
 end)() end,
-    [159] = function()local wax,script,require=ImportGlobals(159)local ImportGlobals return (function(...)--// Imports \\--
+    [159] = function()local wax,script,require,CreateLookupTable=ImportGlobals(159)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 
@@ -19425,7 +19584,7 @@ return function(props: {
 			end
 		end
 
-		local PluginManager = wax.shared.RobloxPLPluginManager
+		local PluginManager = wax.shared.CobaltPluginManager
 		local PluginTabRegistry = PluginManager
 				and PluginManager.Registry.UIHooks.RemoteInfo.Tabs[Modal.Tabs.CurrentTab]
 			or nil
@@ -19655,7 +19814,7 @@ return function(props: {
 end
 
 end)() end,
-    [160] = function()local wax,script,require=ImportGlobals(160)local ImportGlobals return (function(...)--// Imports \\--
+    [160] = function()local wax,script,require,CreateLookupTable=ImportGlobals(160)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 
@@ -19917,11 +20076,11 @@ return function(props: {
 	end
 
 	task.spawn(function()
-		while not wax.shared.RobloxPLPluginManager or not wax.shared.RobloxPLPluginManager.Initialized do
+		while not wax.shared.CobaltPluginManager or not wax.shared.CobaltPluginManager.Initialized do
 			task.wait()
 		end
 
-		local Registry = wax.shared.RobloxPLPluginManager.Registry
+		local Registry = wax.shared.CobaltPluginManager.Registry
 		local LoadedCount = #Registry.Plugins
 		local ErrorCount = #Registry.Errored
 
@@ -19972,7 +20131,7 @@ return function(props: {
 end
 
 end)() end,
-    [161] = function()local wax,script,require=ImportGlobals(161)local ImportGlobals return (function(...)--// Imports \\--
+    [161] = function()local wax,script,require,CreateLookupTable=ImportGlobals(161)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 local Types = require("@src/Window/Types")
@@ -20043,7 +20202,7 @@ local function SetupModal(ModalController: ModalController.Modal)
 	})
 
 	local SearchCloseImage = Interface.NewIcon("x", {
-		ImageTransparency = 0.5,
+		IconTransparency = 0.5,
 		Size = UDim2.fromOffset(22, 22),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -20436,7 +20595,7 @@ return function(props: {
 end
 
 end)() end,
-    [162] = function()local wax,script,require=ImportGlobals(162)local ImportGlobals return (function(...)--// Imports \\--
+    [162] = function()local wax,script,require,CreateLookupTable=ImportGlobals(162)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Types = require("@src/Window/Types")
 
@@ -20752,7 +20911,7 @@ return function(props: {
 				end
 
 				local LogConnection = wax.shared.SetupLoggingConnection()
-				SessionLogLabel.Text = `Current Log File: <b>{wax.shared.LogFileName:gsub("RobloxPL/Logs/", "")}</b>`
+				SessionLogLabel.Text = `Current Log File: <b>{wax.shared.LogFileName:gsub("Cobalt/Logs/", "")}</b>`
 				wax.shared.LogConnection = wax.shared.Connect(wax.shared.Communicator.Event:Connect(LogConnection))
 
 				wax.shared.Sonner.success("Successfully enabled file logging")
@@ -20761,12 +20920,12 @@ return function(props: {
 
 		SessionLogLabel = LoggingSection:AddLabel(
 			`Current Log File: <b>{wax.shared.Settings.EnableLogging.Value and wax.shared.LogFileName:gsub(
-				"RobloxPL/Logs/",
+				"Cobalt/Logs/",
 				""
 			) or "Not Logging"}</b>`
 		)
 
-		LoggingSection:AddLabel(`Log Folder: <b>RobloxPL/Logs</b>`)
+		LoggingSection:AddLabel(`Log Folder: <b>Cobalt/Logs</b>`)
 
 		--// Session Buttons Row \\--
 		LoggingSection:AddSpacer()
@@ -20778,7 +20937,7 @@ return function(props: {
 					return
 				end
 
-				local ActualLogFileName = wax.shared.LogFileName:gsub("RobloxPL/Logs/", "")
+				local ActualLogFileName = wax.shared.LogFileName:gsub("Cobalt/Logs/", "")
 				local Success, Error = pcall(setclipboard, ActualLogFileName)
 
 				if not Success then
@@ -20824,7 +20983,7 @@ return function(props: {
 				local Events, StringMap = Session:ProcessCalls(AllCalls, SessionData, UpdateProgress)
 
 				--// Export \\--
-				local FileName = `RobloxPL_Session_{os.time()}.html`
+				local FileName = `Cobalt_Session_{os.time()}.html`
 				writefile(FileName, Session:ExportSessionToHTML(Events, StringMap, SessionData))
 				return FileName
 			end, {
@@ -20861,7 +21020,7 @@ return function(props: {
 
 		Settings.DisableNonEssentialChecks:SetupOption(CompatibilitySection)
 		Settings.AnticheatBypass:SetupOption(CompatibilitySection)
-		CompatibilitySection:AddLabel("These options take effect the next time RobloxPL launches.", 13).TextTransparency =
+		CompatibilitySection:AddLabel("These options take effect the next time Cobalt launches.", 13).TextTransparency =
 			0.5
 
 		if AnticheatData.Disabled then
@@ -20871,7 +21030,7 @@ return function(props: {
 
 	--// About & Credits Section \\--
 	local CreditsSection = MainSettings:CreateSection("About & Credits")
-	CreditsSection:AddLabel("RobloxPL and the open-source projects that make it possible.", 14).TextTransparency = 0.35
+	CreditsSection:AddLabel("Cobalt and the open-source projects that make it possible.", 14).TextTransparency = 0.35
 	CreditsSection:AddSpacer()
 	CreditsSection:CreateButton("View Credits", function()
 		Window.Dialogs.Credits.Open(Window)
@@ -20889,7 +21048,7 @@ return function(props: {
 end
 
 end)() end,
-    [163] = function()local wax,script,require=ImportGlobals(163)local ImportGlobals return (function(...)export type SupportedRemoteTypes = RemoteEvent | RemoteFunction | BindableEvent | BindableFunction | UnreliableRemoteEvent
+    [163] = function()local wax,script,require,CreateLookupTable=ImportGlobals(163)local ImportGlobals return (function(...)export type SupportedRemoteTypes = RemoteEvent | RemoteFunction | BindableEvent | BindableFunction | UnreliableRemoteEvent
 
 export type LogDirection = "Outgoing" | "Incoming"
 
@@ -21051,11 +21210,11 @@ export type Dialog = {
 	Overlay: TextButton,
 	Container: CanvasGroup,
 	Scale: UIScale,
-	CloseButton: ImageButton,
+	CloseButton: GuiButton,
 	Header: {
 		TitleLabel: TextLabel,
 		DescriptionLabel: TextLabel,
-		HeaderIcon: ImageLabel,
+		HeaderIcon: GuiObject,
 	},
 	MainContent: Frame,
 	Buttons: { [string]: DialogButton },
@@ -21073,7 +21232,7 @@ export type DialogFooterAction = "Dismiss" | ((Dialog) -> ())
 export type DialogButton = {
 	Instance: ImageButton,
 	Label: TextLabel,
-	Icon: ImageLabel,
+	Icon: GuiObject,
 	Disabled: boolean,
 
 	SetDisabled: (DialogButton, boolean) -> (),
@@ -21149,7 +21308,7 @@ export type LogDirectionTab = {
 return {}
 
 end)() end,
-    [165] = function()local wax,script,require=ImportGlobals(165)local ImportGlobals return (function(...)local Animations = {
+    [165] = function()local wax,script,require,CreateLookupTable=ImportGlobals(165)local ImportGlobals return (function(...)local Animations = {
 	TweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Exponential),
 	Exclusions = {},
 	Expectations = { In = {}, Out = {} },
@@ -21266,7 +21425,7 @@ end
 return Animations
 
 end)() end,
-    [166] = function()local wax,script,require=ImportGlobals(166)local ImportGlobals return (function(...)local DPI = {}
+    [166] = function()local wax,script,require,CreateLookupTable=ImportGlobals(166)local ImportGlobals return (function(...)local DPI = {}
 export type DPI = typeof(DPI)
 DPI.__index = DPI
 
@@ -21298,7 +21457,7 @@ end
 return DPI
 
 end)() end,
-    [168] = function()local wax,script,require=ImportGlobals(168)local ImportGlobals return (function(...)local Drag = {
+    [168] = function()local wax,script,require,CreateLookupTable=ImportGlobals(168)local ImportGlobals return (function(...)local Drag = {
 	Dragging = false,
 	Frame = nil,
 	FramePosition = nil,
@@ -21393,7 +21552,7 @@ end))
 return Drag
 
 end)() end,
-    [169] = function()local wax,script,require=ImportGlobals(169)local ImportGlobals return (function(...)local Input = {}
+    [169] = function()local wax,script,require,CreateLookupTable=ImportGlobals(169)local ImportGlobals return (function(...)local Input = {}
 
 function Input.IsMouseOverFrame(Frame: GuiObject, Position: Vector3): boolean
 	local AbsPos, AbsSize = Frame.AbsolutePosition, Frame.AbsoluteSize
@@ -21422,7 +21581,7 @@ end
 return Input
 
 end)() end,
-    [170] = function()local wax,script,require=ImportGlobals(170)local ImportGlobals return (function(...)local Resize = {}
+    [170] = function()local wax,script,require,CreateLookupTable=ImportGlobals(170)local ImportGlobals return (function(...)local Resize = {}
 Resize.__index = Resize
 
 local Interface = require("@src/Utils/UI/Interface")
@@ -21738,7 +21897,7 @@ end
 return Resize
 
 end)() end,
-    [171] = function()local wax,script,require=ImportGlobals(171)local ImportGlobals return (function(...)--[[
+    [171] = function()local wax,script,require,CreateLookupTable=ImportGlobals(171)local ImportGlobals return (function(...)--[[
 
 	Pagination Wrapper Util for the window
 
@@ -21819,7 +21978,7 @@ return {
 }
 
 end)() end,
-    [173] = function()local wax,script,require=ImportGlobals(173)local ImportGlobals return (function(...)--[[
+    [173] = function()local wax,script,require,CreateLookupTable=ImportGlobals(173)local ImportGlobals return (function(...)--[[
 
 Luau syntax highlighter with studio colors
 Based on: https://devforum.roblox.com/t/realtime-richtext-lua-syntax-highlighting/2500399
@@ -22074,7 +22233,7 @@ end
 return Highlighter
 
 end)() end,
-    [174] = function()local wax,script,require=ImportGlobals(174)local ImportGlobals return (function(...)local LazySerializer = {}
+    [174] = function()local wax,script,require,CreateLookupTable=ImportGlobals(174)local ImportGlobals return (function(...)local LazySerializer = {}
 
 local InstanceSerializer = require("@src/Utils/CodeGen/Serializer/Instance")
 
@@ -22128,7 +22287,7 @@ end
 return LazySerializer
 
 end)() end,
-    [175] = function()local wax,script,require=ImportGlobals(175)local ImportGlobals return (function(...)local TextBounds = {}
+    [175] = function()local wax,script,require,CreateLookupTable=ImportGlobals(175)local ImportGlobals return (function(...)local TextBounds = {}
 
 local BoundsCache = {}
 local BoundsCacheOrder = {}
@@ -22179,7 +22338,7 @@ end
 return TextBounds
 
 end)() end,
-    [177] = function()local wax,script,require=ImportGlobals(177)local ImportGlobals return (function(...)--// Imports \\--
+    [177] = function()local wax,script,require,CreateLookupTable=ImportGlobals(177)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 local Types = require("@src/Window/Types")
@@ -22372,7 +22531,7 @@ return function(props: {
 end
 
 end)() end,
-    [179] = function()local wax,script,require=ImportGlobals(179)local ImportGlobals return (function(...)--// Imports \\--
+    [179] = function()local wax,script,require,CreateLookupTable=ImportGlobals(179)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 local Types = require("@src/Window/Types")
@@ -22648,7 +22807,7 @@ return function(props: {
 			},
 		}
 
-		local PluginManager = wax.shared.RobloxPLPluginManager
+		local PluginManager = wax.shared.CobaltPluginManager
 		if PluginManager and PluginManager.Registry.UIHooks.ContextMenus.CallList then
 			for _, Option in PluginManager.Registry.UIHooks.ContextMenus.CallList do
 				table.insert(ContextMenuOptions, {
@@ -22896,8 +23055,8 @@ return function(props: {
 		if IsBlockedCall then
 			OriginIcon = Interface.NewIcon("ban", {
 				AnchorPoint = Vector2.yAxis,
-				ImageColor3 = Color3.fromRGB(255, 151, 151),
-				ImageTransparency = 0.5,
+				IconColor3 = Color3.fromRGB(255, 151, 151),
+				IconTransparency = 0.5,
 				Position = UDim2.new(0, 2, 1, 0),
 				Size = UDim2.fromOffset(22, 22),
 				SizeConstraint = Enum.SizeConstraint.RelativeYY,
@@ -22905,8 +23064,8 @@ return function(props: {
 		elseif CallInfo.IsRakNet then
 			OriginIcon = Interface.NewIcon("network", {
 				AnchorPoint = Vector2.yAxis,
-				ImageColor3 = Color3.new(1, 1, 1),
-				ImageTransparency = 0.5,
+				IconColor3 = Color3.new(1, 1, 1),
+				IconTransparency = 0.5,
 				Position = UDim2.new(0, 2, 1, 0),
 				Size = UDim2.fromOffset(22, 22),
 				SizeConstraint = Enum.SizeConstraint.RelativeYY,
@@ -22914,8 +23073,8 @@ return function(props: {
 		else
 			OriginIcon = Interface.NewIcon(CallInfo.IsExecutor and "terminal" or "gamepad-2", {
 				AnchorPoint = Vector2.yAxis,
-				ImageColor3 = Color3.new(1, 1, 1),
-				ImageTransparency = 0.5,
+				IconColor3 = Color3.new(1, 1, 1),
+				IconTransparency = 0.5,
 				Position = UDim2.new(0, 2, 1, 0),
 				Size = UDim2.fromOffset(22, 22),
 				SizeConstraint = Enum.SizeConstraint.RelativeYY,
@@ -23258,7 +23417,7 @@ return function(props: {
 end
 
 end)() end,
-    [180] = function()local wax,script,require=ImportGlobals(180)local ImportGlobals return (function(...)--// Imports \\--
+    [180] = function()local wax,script,require,CreateLookupTable=ImportGlobals(180)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 local Types = require("@src/Window/Types")
@@ -23332,7 +23491,7 @@ return function(props: {
 end
 
 end)() end,
-    [181] = function()local wax,script,require=ImportGlobals(181)local ImportGlobals return (function(...)--// Imports \\--
+    [181] = function()local wax,script,require,CreateLookupTable=ImportGlobals(181)local ImportGlobals return (function(...)--// Imports \\--
 local Interface = require("@src/Utils/UI/Interface")
 local Constants = require("@src/Window/Constants")
 local Types = require("@src/Window/Types")
@@ -23543,7 +23702,7 @@ return function(props: {
 			},
 		}
 
-		local PluginManager = wax.shared.RobloxPLPluginManager
+		local PluginManager = wax.shared.CobaltPluginManager
 		if PluginManager and PluginManager.Registry.UIHooks.ContextMenus.RemoteList then
 			for _, Option in PluginManager.Registry.UIHooks.ContextMenus.RemoteList do
 				table.insert(ContextMenuOptions, {
@@ -23668,7 +23827,7 @@ local ObjectTree = {
         1,
         4,
         {
-            "RobloxPL"
+            "cobalt"
         },
         {
             {
@@ -23678,387 +23837,6 @@ local ObjectTree = {
                     "Window"
                 },
                 {
-                    {
-                        124,
-                        1,
-                        {
-                            "Components"
-                        },
-                        {
-                            {
-                                136,
-                                2,
-                                {
-                                    "Modal"
-                                },
-                                {
-                                    {
-                                        137,
-                                        1,
-                                        {
-                                            "Builder"
-                                        },
-                                        {
-                                            {
-                                                138,
-                                                1,
-                                                {
-                                                    "Controls"
-                                                },
-                                                {
-                                                    {
-                                                        142,
-                                                        2,
-                                                        {
-                                                            "RemoteList"
-                                                        }
-                                                    },
-                                                    {
-                                                        139,
-                                                        2,
-                                                        {
-                                                            "CallFilterList"
-                                                        }
-                                                    },
-                                                    {
-                                                        140,
-                                                        2,
-                                                        {
-                                                            "Checkbox"
-                                                        }
-                                                    },
-                                                    {
-                                                        144,
-                                                        2,
-                                                        {
-                                                            "TextBox"
-                                                        }
-                                                    },
-                                                    {
-                                                        143,
-                                                        2,
-                                                        {
-                                                            "SettingSync"
-                                                        }
-                                                    },
-                                                    {
-                                                        141,
-                                                        2,
-                                                        {
-                                                            "Dropdown"
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                            {
-                                                145,
-                                                2,
-                                                {
-                                                    "Section"
-                                                }
-                                            },
-                                            {
-                                                146,
-                                                2,
-                                                {
-                                                    "Settings"
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                127,
-                                2,
-                                {
-                                    "Dialogs"
-                                },
-                                {
-                                    {
-                                        135,
-                                        2,
-                                        {
-                                            "RakNet"
-                                        }
-                                    },
-                                    {
-                                        131,
-                                        2,
-                                        {
-                                            "DeleteCallFilter"
-                                        }
-                                    },
-                                    {
-                                        132,
-                                        2,
-                                        {
-                                            "DetectionRisk"
-                                        }
-                                    },
-                                    {
-                                        133,
-                                        2,
-                                        {
-                                            "LoggingDisabled"
-                                        }
-                                    },
-                                    {
-                                        134,
-                                        2,
-                                        {
-                                            "Oth"
-                                        }
-                                    },
-                                    {
-                                        130,
-                                        2,
-                                        {
-                                            "Credits"
-                                        }
-                                    },
-                                    {
-                                        129,
-                                        2,
-                                        {
-                                            "ClearCapturedCalls"
-                                        }
-                                    },
-                                    {
-                                        128,
-                                        2,
-                                        {
-                                            "CallFilter"
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                125,
-                                2,
-                                {
-                                    "ContextMenu"
-                                }
-                            },
-                            {
-                                147,
-                                2,
-                                {
-                                    "QueryBuilder"
-                                },
-                                {
-                                    {
-                                        148,
-                                        2,
-                                        {
-                                            "UI"
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                150,
-                                2,
-                                {
-                                    "Topbar"
-                                }
-                            },
-                            {
-                                149,
-                                2,
-                                {
-                                    "Sonner"
-                                }
-                            },
-                            {
-                                126,
-                                2,
-                                {
-                                    "Dialog"
-                                }
-                            }
-                        }
-                    },
-                    {
-                        152,
-                        1,
-                        {
-                            "Modals"
-                        },
-                        {
-                            {
-                                160,
-                                2,
-                                {
-                                    "Plugins"
-                                }
-                            },
-                            {
-                                161,
-                                2,
-                                {
-                                    "Search"
-                                }
-                            },
-                            {
-                                153,
-                                2,
-                                {
-                                    "Info"
-                                },
-                                {
-                                    {
-                                        159,
-                                        2,
-                                        {
-                                            "Shell"
-                                        }
-                                    },
-                                    {
-                                        154,
-                                        1,
-                                        {
-                                            "Components"
-                                        },
-                                        {
-                                            {
-                                                158,
-                                                2,
-                                                {
-                                                    "FunctionInfoView"
-                                                }
-                                            },
-                                            {
-                                                156,
-                                                2,
-                                                {
-                                                    "CodeView"
-                                                }
-                                            },
-                                            {
-                                                155,
-                                                2,
-                                                {
-                                                    "ArgumentList"
-                                                }
-                                            },
-                                            {
-                                                157,
-                                                2,
-                                                {
-                                                    "FooterButtons"
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                162,
-                                2,
-                                {
-                                    "Settings"
-                                }
-                            }
-                        }
-                    },
-                    {
-                        163,
-                        2,
-                        {
-                            "Types"
-                        }
-                    },
-                    {
-                        164,
-                        1,
-                        {
-                            "Utils"
-                        },
-                        {
-                            {
-                                165,
-                                2,
-                                {
-                                    "Animations"
-                                }
-                            },
-                            {
-                                167,
-                                1,
-                                {
-                                    "Input"
-                                },
-                                {
-                                    {
-                                        168,
-                                        2,
-                                        {
-                                            "Drag"
-                                        }
-                                    },
-                                    {
-                                        169,
-                                        2,
-                                        {
-                                            "Input"
-                                        }
-                                    },
-                                    {
-                                        170,
-                                        2,
-                                        {
-                                            "Resize"
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                172,
-                                1,
-                                {
-                                    "Text"
-                                },
-                                {
-                                    {
-                                        173,
-                                        2,
-                                        {
-                                            "Highlighter"
-                                        }
-                                    },
-                                    {
-                                        174,
-                                        2,
-                                        {
-                                            "LazySerializer"
-                                        }
-                                    },
-                                    {
-                                        175,
-                                        2,
-                                        {
-                                            "TextBounds"
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                166,
-                                2,
-                                {
-                                    "DPI"
-                                }
-                            },
-                            {
-                                171,
-                                2,
-                                {
-                                    "Pagination"
-                                }
-                            }
-                        }
-                    },
                     {
                         176,
                         1,
@@ -24088,17 +23866,398 @@ local ObjectTree = {
                                                 }
                                             },
                                             {
+                                                180,
+                                                2,
+                                                {
+                                                    "DirectionTabs"
+                                                }
+                                            },
+                                            {
                                                 181,
                                                 2,
                                                 {
                                                     "List"
                                                 }
-                                            },
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        124,
+                        1,
+                        {
+                            "Components"
+                        },
+                        {
+                            {
+                                126,
+                                2,
+                                {
+                                    "Dialog"
+                                }
+                            },
+                            {
+                                136,
+                                2,
+                                {
+                                    "Modal"
+                                },
+                                {
+                                    {
+                                        137,
+                                        1,
+                                        {
+                                            "Builder"
+                                        },
+                                        {
                                             {
-                                                180,
+                                                146,
                                                 2,
                                                 {
-                                                    "DirectionTabs"
+                                                    "Settings"
+                                                }
+                                            },
+                                            {
+                                                145,
+                                                2,
+                                                {
+                                                    "Section"
+                                                }
+                                            },
+                                            {
+                                                138,
+                                                1,
+                                                {
+                                                    "Controls"
+                                                },
+                                                {
+                                                    {
+                                                        142,
+                                                        2,
+                                                        {
+                                                            "RemoteList"
+                                                        }
+                                                    },
+                                                    {
+                                                        144,
+                                                        2,
+                                                        {
+                                                            "TextBox"
+                                                        }
+                                                    },
+                                                    {
+                                                        140,
+                                                        2,
+                                                        {
+                                                            "Checkbox"
+                                                        }
+                                                    },
+                                                    {
+                                                        139,
+                                                        2,
+                                                        {
+                                                            "CallFilterList"
+                                                        }
+                                                    },
+                                                    {
+                                                        143,
+                                                        2,
+                                                        {
+                                                            "SettingSync"
+                                                        }
+                                                    },
+                                                    {
+                                                        141,
+                                                        2,
+                                                        {
+                                                            "Dropdown"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                150,
+                                2,
+                                {
+                                    "Topbar"
+                                }
+                            },
+                            {
+                                147,
+                                2,
+                                {
+                                    "QueryBuilder"
+                                },
+                                {
+                                    {
+                                        148,
+                                        2,
+                                        {
+                                            "UI"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                127,
+                                2,
+                                {
+                                    "Dialogs"
+                                },
+                                {
+                                    {
+                                        133,
+                                        2,
+                                        {
+                                            "LoggingDisabled"
+                                        }
+                                    },
+                                    {
+                                        135,
+                                        2,
+                                        {
+                                            "RakNet"
+                                        }
+                                    },
+                                    {
+                                        129,
+                                        2,
+                                        {
+                                            "ClearCapturedCalls"
+                                        }
+                                    },
+                                    {
+                                        128,
+                                        2,
+                                        {
+                                            "CallFilter"
+                                        }
+                                    },
+                                    {
+                                        132,
+                                        2,
+                                        {
+                                            "DetectionRisk"
+                                        }
+                                    },
+                                    {
+                                        131,
+                                        2,
+                                        {
+                                            "DeleteCallFilter"
+                                        }
+                                    },
+                                    {
+                                        134,
+                                        2,
+                                        {
+                                            "Oth"
+                                        }
+                                    },
+                                    {
+                                        130,
+                                        2,
+                                        {
+                                            "Credits"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                125,
+                                2,
+                                {
+                                    "ContextMenu"
+                                }
+                            },
+                            {
+                                149,
+                                2,
+                                {
+                                    "Sonner"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        163,
+                        2,
+                        {
+                            "Types"
+                        }
+                    },
+                    {
+                        164,
+                        1,
+                        {
+                            "Utils"
+                        },
+                        {
+                            {
+                                167,
+                                1,
+                                {
+                                    "Input"
+                                },
+                                {
+                                    {
+                                        169,
+                                        2,
+                                        {
+                                            "Input"
+                                        }
+                                    },
+                                    {
+                                        170,
+                                        2,
+                                        {
+                                            "Resize"
+                                        }
+                                    },
+                                    {
+                                        168,
+                                        2,
+                                        {
+                                            "Drag"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                165,
+                                2,
+                                {
+                                    "Animations"
+                                }
+                            },
+                            {
+                                171,
+                                2,
+                                {
+                                    "Pagination"
+                                }
+                            },
+                            {
+                                166,
+                                2,
+                                {
+                                    "DPI"
+                                }
+                            },
+                            {
+                                172,
+                                1,
+                                {
+                                    "Text"
+                                },
+                                {
+                                    {
+                                        173,
+                                        2,
+                                        {
+                                            "Highlighter"
+                                        }
+                                    },
+                                    {
+                                        175,
+                                        2,
+                                        {
+                                            "TextBounds"
+                                        }
+                                    },
+                                    {
+                                        174,
+                                        2,
+                                        {
+                                            "LazySerializer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        152,
+                        1,
+                        {
+                            "Modals"
+                        },
+                        {
+                            {
+                                160,
+                                2,
+                                {
+                                    "Plugins"
+                                }
+                            },
+                            {
+                                161,
+                                2,
+                                {
+                                    "Search"
+                                }
+                            },
+                            {
+                                162,
+                                2,
+                                {
+                                    "Settings"
+                                }
+                            },
+                            {
+                                153,
+                                2,
+                                {
+                                    "Info"
+                                },
+                                {
+                                    {
+                                        159,
+                                        2,
+                                        {
+                                            "Shell"
+                                        }
+                                    },
+                                    {
+                                        154,
+                                        1,
+                                        {
+                                            "Components"
+                                        },
+                                        {
+                                            {
+                                                156,
+                                                2,
+                                                {
+                                                    "CodeView"
+                                                }
+                                            },
+                                            {
+                                                155,
+                                                2,
+                                                {
+                                                    "ArgumentList"
+                                                }
+                                            },
+                                            {
+                                                157,
+                                                2,
+                                                {
+                                                    "FooterButtons"
+                                                }
+                                            },
+                                            {
+                                                158,
+                                                2,
+                                                {
+                                                    "FunctionInfoView"
                                                 }
                                             }
                                         }
@@ -24117,10 +24276,123 @@ local ObjectTree = {
                 }
             },
             {
-                2,
+                3,
                 2,
                 {
-                    "ExecutorSupport"
+                    "Spy"
+                },
+                {
+                    {
+                        4,
+                        1,
+                        {
+                            "Hooks"
+                        },
+                        {
+                            {
+                                5,
+                                2,
+                                {
+                                    "Luau"
+                                },
+                                {
+                                    {
+                                        6,
+                                        1,
+                                        {
+                                            "Actors"
+                                        },
+                                        {
+                                            {
+                                                7,
+                                                5,
+                                                {
+                                                    "Environment",
+                                                    Value = "--[[\n\n    Wax Environment replicated for actor env\n\n\tNOTE: the @include regions are autogenerated by the build system, do not modify them in this file.\n\tTo modify the code, modify the source files where the export regions are defined.\n]]\n\nif getgenv().CobaltInitialized == true then\n\treturn\nend\n\ngetgenv().CobaltInitialized = true\n\ntype ActorData = {\n\tToken: string,\n\tIncomingConnections: boolean,\n\tIncomingCallbacks: boolean,\n\tHookIncomingConnections: boolean,\n\tOutgoing: boolean,\n\n\tIgnorePlayerModule: boolean,\n\tLogBlockedRemotes: boolean,\n\tIgnoredRemotesDropdown: { [string]: boolean },\n\n\tExecutorSupport: { [string]: { IsWorking: boolean } },\n}\n\nlocal Data: ActorData = COBALT_ACTOR_DATA\n\nlocal function CreateLookupTable(Values)\n\tif type(Values) ~= \"table\" then\n\t\treturn Values\n\tend\n\n\tlocal LookupTable = {}\n\tfor Key, Value in next, Values do\n\t\tif type(Key) == \"number\" then\n\t\t\tLookupTable[Value] = true\n\t\telse\n\t\t\tLookupTable[Key] = Value\n\t\tend\n\tend\n\n\treturn LookupTable\nend\n\nlocal ChannelId, CurrentActor = ...\nif typeof(CurrentActor) == \"Instance\" then\n\tCurrentActor = cloneref(CurrentActor)\nend\n\nlocal function ResolveCurrentActor(Origin)\n\tif Origin and getluastate then\n\t\tlocal Success, LuaStateProxy = pcall(getluastate, Origin)\n\n\t\t-- Best effort to find origin actor\n\t\tif Success then\n\t\t\tlocal Actors = LuaStateProxy:GetActors()\n\t\t\tfor _, Actor in Actors do\n\t\t\t\tif Origin:IsDescendantOf(Actor) then\n\t\t\t\t\treturn cloneref(Actor)\n\t\t\t\tend\n\t\t\tend\n\n\t\t\tif #Actors == 1 then\n\t\t\t\treturn cloneref(Actors[1])\n\t\t\tend\n\t\tend\n\tend\n\n\t-- A LuaState can have several actors assigned to it if the worker limit gets reached\n\t-- Therefore to resolve the actual origin we use get_current_actor\n\tlocal ResolvedActor = get_current_actor and get_current_actor()\n\tif typeof(ResolvedActor) == \"Instance\" then\n\t\treturn cloneref(ResolvedActor)\n\tend\n\n\t-- Probably accurate, but maybe not\n\treturn CurrentActor\nend\n\nlocal RelayChannel = get_comm_channel(ChannelId)\n\nlocal wax = {shared = {}}\nwax.shared.IS_ACTOR = true\nwax.shared.CobaltVerificationToken = Data.Token\nlocal OnUnload\ndo\n\twax.shared.Hooks = {}\n\n\twax.shared.Settings = {\n\t\tIgnorePlayerModule = { Value = Data.IgnorePlayerModule },\n\t\tLogBlockedRemotes = { Value = Data.LogBlockedRemotes },\n\t\tIgnoredRemotesDropdown = { Value = Data.IgnoredRemotesDropdown },\n\t\tLogRobloxInternalEvents = { Value = Data.LogRobloxInternalEvents },\n\t}\n\n\twax.shared.SaveManager = {\n\t\tGetState = function(Idx, Default)\n\t\t\treturn (wax.shared.Settings[Idx] and wax.shared.Settings[Idx].Value) or Data[Idx] or Default\n\t\tend,\n\t}\n\n\twax.shared.Log = {}\n\tdo\n\t\twax.shared.Logs = {\n\t\t\tOutgoing = {},\n\t\t\tIncoming = {},\n\t\t}\n\n\t\twax.shared.NewLog = function(Instance, Type, CallingScript, DebugId)\n\t\t\tlocal NewLog = wax.shared.Log.new(Instance, Type, 0, CallingScript)\n\t\t\twax.shared.Logs[Type][DebugId] = NewLog\n\t\t\treturn NewLog\n\t\tend\n\tend\n\n\twax.shared.ExecutorSupport = Data.ExecutorSupport\n\twax.shared.Communicator = RelayChannel\n\twax.shared.ExecutorName = string.split(identifyexecutor(), \" \")[1]\n\n\t--// Services \\\\--\n\tfor _, Service in pairs({\n\t\t\"Players\",\n\t\t\"HttpService\",\n\t\t\"RobloxReplicatedStorage\",\n\t}) do\n\t\twax.shared[Service] = cloneref(game:GetService(Service))\n\tend\n\n\twax.shared.trampoline_call = trampoline_call or (syn and syn.trampoline_call)\n\n\t--// Event Reference \\\\--\n\n\tlocal InstanceSerializer = {}\n\tdo\n\t\t--#region @include region IsEqualToInstance\n\t\t--[[\n\t\t    Checks if two instances are equal.\n\n\t\t    @param Object: The first instance.\n\t\t    @param ToCompareTo: The second instance.\n\t\t    @return Whether the instances are equal.\n\t\t]]\n\t\tlocal function IsEqualToInstance(Object, ToCompareTo)\n\t\t\tif typeof(Object) ~= \"Instance\" or typeof(ToCompareTo) ~= \"Instance\" then return false end\n\n\t\t\tif rawequal(Object, ToCompareTo) then\n\t\t\t\treturn true\n\t\t\tend\n\n\t\t\tif wax.shared.ExecutorSupport[\"compareinstances\"].IsWorking then\n\t\t\t\treturn compareinstances(Object, ToCompareTo)\n\t\t\tend\n\n\t\t\tlocal ObjectDebugId, ToCompareToDebugId, ShouldCompareDebugIds = nil, nil, false\n\t\t\tdo\n\t\t\t\tlocal Success, ObjectDebugIdResult = pcall(wax.shared.GetDebugId, Object)\n\t\t\t\tlocal Success2, ToCompareToDebugIdResult = pcall(wax.shared.GetDebugId, ToCompareTo)\n\n\t\t\t\tif Success and Success2 then\n\t\t\t\t\tObjectDebugId = ObjectDebugIdResult\n\t\t\t\t\tToCompareToDebugId = ToCompareToDebugIdResult\n\t\t\t\t\tShouldCompareDebugIds = true\n\t\t\t\tend\n\t\t\tend\n\n\t\t\tif ShouldCompareDebugIds then\n\t\t\t\treturn ObjectDebugId == ToCompareToDebugId\n\t\t\tend\n\n\t\t\treturn false\n\t\tend\n\t\t--#endregion\n\n\t\tInstanceSerializer.IsEqualToInstance = IsEqualToInstance\n\tend\n\twax.shared.InstanceSerializer = InstanceSerializer\n\n\tlocal Formatter = {}\n\tdo\n\t\t--#region @include region FormatLuaLiteral\n\t\t--// Populate CleanTable \\\\--\n\t\tFormatter.CleanTable = { ['\"'] = '\\\\\"', [\"\\\\\"] = \"\\\\\\\\\" }\n\t\tdo\n\t\t\tfor i = 0, 31 do\n\t\t\t\tFormatter.CleanTable[string.char(i)] = \"\\\\\" .. string.format(\"%03d\", i)\n\t\t\tend\n\t\t\tfor i = 127, 255 do\n\t\t\t\tFormatter.CleanTable[string.char(i)] = \"\\\\\" .. string.format(\"%03d\", i)\n\t\t\tend\n\t\tend\n\n\t\t--// Indent Template \\\\--\n\t\tlocal IndentTemplate = string.rep(\" \", 4)\n\n\t\t--[[\n\t\t    Formats a Lua string to be used in a Lua code block.\n\n\t\t    @param str: The string to format.\n\t\t    @return The formatted string.\n\t\t]]\n\t\tfunction Formatter.FormatLuaString(str)\n\t\t\treturn string.gsub(str, '[\"\\\\\\0-\\31\\127-\\255]', Formatter.CleanTable)\n\t\tend\n\n\t\t--[[\n\t\t    Formats a Lua literal to be used in a Lua code block.\n\n\t\t    @param Value: The value to format.\n\t\t    @return The formatted string.\n\t\t]]\n\t\tfunction Formatter.FormatLuaLiteral(Value): string?\n\t\t\tlocal ValueType = type(Value)\n\t\t\tif ValueType == \"string\" then\n\t\t\t\treturn `\"{Formatter.FormatLuaString(Value)}\"`\n\t\t\telseif ValueType == \"number\" or ValueType == \"boolean\" then\n\t\t\t\treturn tostring(Value)\n\t\t\tend\n\n\t\t\treturn nil\n\t\tend\n\t\t--#endregion\n\tend\n\n\t--#region @include region FindEventReferenceInTable\n\t\t--[[\n\t\t\tFinds an event reference in a table, used to search upvalues which are tables.\n\n\t\t\t@param Table: The table to search.\n\t\t\t@param Instance: The instance to search for.\n\t\t\t@param Visited: The visited table.\n\t\t\t@return The event reference.\n\t\t]]\n\t\tlocal function FindEventReferenceInTable(\n\t\t\tTable: { [any]: any },\n\t\t\tInstance: Instance,\n\t\t\tVisited: { [any]: boolean }?\n\t\t): { any }?\n\t\t\tlocal Seen = Visited or {}\n\t\t\tif Seen[Table] then\n\t\t\t\treturn nil\n\t\t\tend\n\n\t\t\tSeen[Table] = true\n\n\t\t\tfor Key, Value in next, Table do\n\t\t\t\tif\n\t\t\t\t\ttypeof(Value) == \"Instance\"\n\t\t\t\t\tand InstanceSerializer.IsEqualToInstance(Value, Instance)\n\t\t\t\t\tand Formatter.FormatLuaLiteral(Key)\n\t\t\t\tthen\n\t\t\t\t\treturn { Key }\n\t\t\t\tend\n\n\t\t\t\tif type(Value) == \"table\" and Formatter.FormatLuaLiteral(Key) then\n\t\t\t\t\tlocal ChildPath = FindEventReferenceInTable(Value, Instance, Seen)\n\t\t\t\t\tif ChildPath then\n\t\t\t\t\t\ttable.insert(ChildPath, 1, Key)\n\t\t\t\t\t\treturn ChildPath\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\n\t\t\treturn nil\n\t\tend\n\t--#endregion\n\n\t--// Unload \\\\--\n\tlocal RelayConnection\n\tRelayConnection = RelayChannel.Event:Connect(function(Type, ...)\n\t\tif Type == \"Unload\" then\n\t\t\tRelayConnection:Disconnect()\n\t\t\twax.shared.Unloaded = true\n\t\t\tfor _, Connection in wax.shared.Connections do\n\t\t\t\tConnection:Disconnect()\n\t\t\tend\n\t\t\ttable.clear(wax.shared.Connections)\n\n\t\t\tif OnUnload then\n\t\t\t\tOnUnload()\n\t\t\tend\n\t\telseif Type == \"MainBlock\" then\n\t\t\tlocal Instance, EventType = ...\n\t\t\tlocal Log = wax.shared.Logs[EventType][wax.shared.GetDebugId(Instance)]\n\t\t\tif Log then\n\t\t\t\tLog:Block()\n\t\t\tend\n\t\telseif Type == \"MainIgnore\" then\n\t\t\tlocal Instance, EventType = ...\n\t\t\tlocal Log = wax.shared.Logs[EventType][wax.shared.GetDebugId(Instance)]\n\t\t\tif Log then\n\t\t\t\tLog:Ignore()\n\t\t\tend\n\t\telseif Type == \"MainSettingsSync\" then\n\t\t\tlocal Setting, Value = ...\n\t\t\tif wax.shared.Settings[Setting] then\n\t\t\t\twax.shared.Settings[Setting].Value = Value\n\t\t\tend\n\t\telseif Type == \"MainCallFiltersSync\" then\n\t\t\twax.shared.CallFilters:ReplaceAll(..., true)\n\t\telseif Type == \"InspectIncomingConnections\" then\n\t\t\tlocal Instance, Method, LogIndex, CallIndex = ...\n\t\t\tlocal Success, Signal = pcall(function()\n\t\t\t\treturn Instance[Method]\n\t\t\tend)\n\t\t\tif not Success or typeof(Signal) ~= \"RBXScriptSignal\" then\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tfor _, Connection in getconnections(Signal) do\n\t\t\t\tif Connection.ForeignState then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\n\t\t\t\tlocal Function = typeof(Connection.Function) == \"function\" and Connection.Function or nil\n\n\t\t\t\tlocal Origin\n\t\t\t\tlocal Thread = Connection.Thread\n\t\t\t\tif Thread and getscriptfromthread then\n\t\t\t\t\tOrigin = getscriptfromthread(Thread)\n\t\t\t\tend\n\t\t\t\tif not Origin and Function then\n\t\t\t\t\tlocal Script = rawget(getfenv(Function), \"script\")\n\t\t\t\t\tif typeof(Script) == \"Instance\" then\n\t\t\t\t\t\tOrigin = Script\n\t\t\t\t\tend\n\t\t\t\tend\n\n\t\t\t\tlocal FixedInfo, CyclicRefs, ContainsCyclicRef = wax.shared.SerializeActorInfo({\n\t\t\t\t\tOrigin = Origin,\n\t\t\t\t\tFunction = Function,\n\t\t\t\t\tLine = nil,\n\t\t\t\t\tIsExecutor = Function and isexecutorclosure(Function) or false,\n\t\t\t\t\tIsActor = true,\n\t\t\t\t\tActor = ResolveCurrentActor(Origin),\n\t\t\t\t})\n\n\t\t\t\tRelayChannel:Fire(\n\t\t\t\t\t\"IncomingConnectionMetadata\",\n\t\t\t\t\tInstance,\n\t\t\t\t\tLogIndex,\n\t\t\t\t\tCallIndex,\n\t\t\t\t\tFixedInfo,\n\t\t\t\t\tCyclicRefs,\n\t\t\t\t\tContainsCyclicRef\n\t\t\t\t)\n\t\t\tend\n\t\telseif Type == \"ResolveEventReference\" then\n\t\t\tlocal Hash, Instance, IsExecutor, RequestId = ...\n\t\t\tlocal Retrieved = nil\n\n\t\t\tif filtergc then\n\t\t\t\tRetrieved = filtergc(\"function\", {\n\t\t\t\t\tHash = Hash,\n\t\t\t\t\tIgnoreExecutor = not IsExecutor,\n\t\t\t\t}, true)\n\t\t\telse\n\t\t\t\tfor _, Func in getgc() do\n\t\t\t\t\tif typeof(Func) ~= \"function\" then\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tend\n\n\t\t\t\t\tif IsExecutor and not isexecutorclosure(Func) then\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tend\n\n\t\t\t\t\tif getfunctionhash(Func) == Hash then\n\t\t\t\t\t\tRetrieved = Func\n\t\t\t\t\t\tbreak\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\n\t\t\tif not Retrieved then\n\t\t\t\tRelayChannel:Fire(\"ResolveEventReferenceResponse\", RequestId, nil)\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal UpvaluePath = FindEventReferenceInTable(debug.getupvalues(Retrieved), Instance)\n\n\t\t\tif not UpvaluePath then\n\t\t\t\tRelayChannel:Fire(\"ResolveEventReferenceResponse\", RequestId, nil)\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal UpvalueIndex = table.remove(UpvaluePath, 1)\n\t\t\tRelayChannel:Fire(\"ResolveEventReferenceResponse\", RequestId, {\n\t\t\t\tHash = Hash,\n\t\t\t\tIndex = UpvalueIndex,\n\t\t\t\tPath = UpvaluePath,\n\t\t\t})\n\t\tend\n\tend)\n\n\twax.shared.Unloaded = false\nend\n\n--#region @include \"Src/Utils/Connect.luau\" as \"wax.shared.Connect\"\ndo\n\tlocal Connections = {}\n\n\tlocal function Connect(Connection)\n\t\ttable.insert(Connections, Connection)\n\t\treturn Connection\n\tend\n\n\tlocal function Disconnect(Connection)\n\t\tConnection:Disconnect()\n\n\t\tlocal Index = table.find(Connections, Connection)\n\t\tif Index then\n\t\t\ttable.remove(Connections, Index)\n\t\tend\n\n\t\treturn true\n\tend\n\n\twax.shared.Connections = Connections\n\twax.shared.Connect = Connect\n\twax.shared.Disconnect = Disconnect\n\n\twax.shared.Connect = Connect\nend\n--#endregion\n\n--#region @include region PlayerScripts\nwax.shared.LocalPlayer = wax.shared.Players.LocalPlayer\nlocal ContendingPlayerScripts =\n\tcloneref(wax.shared.LocalPlayer:QueryDescendants(\"PlayerScripts\")[1] or wax.shared.LocalPlayer)\nif ContendingPlayerScripts:IsA(\"PlayerScripts\") then\n\twax.shared.PlayerScripts = ContendingPlayerScripts\nelse\n\twax.shared.PlayerScripts = nil\n\n\tlocal ChildAddedConnection\n\tChildAddedConnection = wax.shared.Connect(wax.shared.LocalPlayer.ChildAdded:Connect(function(Child)\n\t\tif Child:IsA(\"PlayerScripts\") then\n\t\t\twax.shared.PlayerScripts = cloneref(Child)\n\t\t\twax.shared.Disconnect(ChildAddedConnection)\n\t\tend\n\tend))\nend\n--#endregion\n\n--#region @include region ExecutorHelpers\nwax.shared.restorefunction = function(Function: (...any) -> ...any, Silent: boolean?)\n\tlocal Original = wax.shared.Hooks[Function]\n\n\tif Silent and not Original then\n\t\treturn\n\tend\n\n\tassert(Original, \"Function not hooked\")\n\n\tif restorefunction and isfunctionhooked(Function) then\n\t\trestorefunction(Function)\n\telse\n\t\twax.shared.Hooking.HookFunction(Function, Original)\n\tend\n\n\twax.shared.Hooks[Function] = nil\nend\nwax.shared.getrawmetatable = wax.shared.ExecutorSupport[\"getrawmetatable\"].IsWorking\n\t\tand (getrawmetatable or debug.getmetatable)\n\tor function()\n\t\treturn setmetatable({}, {\n\t\t\t__index = function()\n\t\t\t\treturn function() end\n\t\t\tend,\n\t\t})\n\tend\n\nlocal RawGetDebugId = clonefunction and clonefunction(game.GetDebugId) or game.GetDebugId\nwax.shared.GetDebugId = function(Instance)\n\tlocal identity = getthreadidentity()\n\tsetthreadidentity(8)\n\tlocal id = RawGetDebugId(Instance)\n\tsetthreadidentity(identity)\n\treturn id\nend\n\nwax.shared.newcclosure = wax.shared.ExecutorName == \"AWP\"\n\t\tand function(f, name)\n\t\t\tlocal env = getfenv(f)\n\t\t\tlocal x = setmetatable({\n\t\t\t\t__F = f,\n\t\t\t}, {\n\t\t\t\t__index = env,\n\t\t\t\t__newindex = env,\n\t\t\t})\n\n\t\t\tlocal nf = function(...)\n\t\t\t\treturn __F(...)\n\t\t\tend\n\n\t\t\tsetfenv(nf, x) -- set func env (env of nf gets deoptimized)\n\t\t\treturn newcclosure(nf, name)\n\t\tend\n\tor newcclosure\n--#endregion\n\n--#region @include \"Src/Utils/Hook/Luau.luau\" as \"wax.shared.Hooking\"\ndo\n\tlocal Hooking = {}\n\n\tHooking.HookFunction = function(Original, Replacement, Filter)\n\t\tif\n\t\t\twax.shared.IsUsingOthHooks\n\t\t\tand iscclosure(Original)\n\t\tthen\n\t\t\treturn oth.hook(Original, Replacement, Filter)\n\t\tend\n\n\t\tif islclosure(Replacement) then\n\t\t\tReplacement = wax.shared.newcclosure(Replacement)\n\t\tend\n\n\t\tif not wax.shared.ExecutorSupport[\"hookfunction\"].IsWorking then\n\t\t\treturn Original\n\t\tend\n\n\t\treturn hookfunction(Original, Replacement, Filter)\n\tend\n\n\tHooking.HookMetaMethod = function(object, method, hook, filter)\n\t\tlocal Metatable = wax.shared.getrawmetatable(object)\n\t\tlocal originalMethod = rawget(Metatable, method)\n\n\t\tassert(typeof(originalMethod) == \"function\", `{method} is not a function in the metatable of {object}`)\n\n\t\tif wax.shared.IsUsingOthHooks then\n\t\t\treturn oth.hook(originalMethod, hook, filter)\n\t\tend\n\n\t\tif islclosure(hook) then\n\t\t\thook = wax.shared.newcclosure(hook)\n\t\tend\n\n\t\tif\n\t\t\tnot wax.shared.ExecutorSupport[\"hookmetamethod\"].IsWorking\n\t\t\tand wax.shared.ExecutorSupport[\"getrawmetatable\"].IsWorking\n\t\tthen\n\t\t\tsetreadonly(Metatable, false)\n\t\t\trawset(Metatable, method, hook)\n\t\t\tsetreadonly(Metatable, true)\n\n\t\t\treturn originalMethod\n\t\tend\n\n\t\tif not wax.shared.ExecutorSupport[\"hookmetamethod\"].IsWorking then\n\t\t\tif method == \"__index\" then\n\t\t\t\tlocal _, Metamethod = xpcall(function()\n\t\t\t\t\treturn object[tostring(math.random())]\n\t\t\t\tend, function(err)\n\t\t\t\t\treturn debug.info(2, \"f\")\n\t\t\t\tend)\n\n\t\t\t\treturn Metamethod\n\t\t\telseif method == \"__newindex\" then\n\t\t\t\tlocal _, Metamethod = xpcall(function()\n\t\t\t\t\tobject[tostring(math.random())] = true\n\t\t\t\tend, function(err)\n\t\t\t\t\treturn debug.info(2, \"f\")\n\t\t\t\tend)\n\n\t\t\t\treturn Metamethod\n\t\t\telseif method == \"__namecall\" then\n\t\t\t\tlocal _, Metamethod = xpcall(function()\n\t\t\t\t\tobject:Mustard()\n\t\t\t\tend, function(err)\n\t\t\t\t\treturn debug.info(2, \"f\")\n\t\t\t\tend)\n\n\t\t\t\treturn Metamethod\n\t\t\tend\n\n\t\t\treturn nil\n\t\tend\n\n\t\tif filter then\n\t\t\treturn hookmetamethod(object, method, hook, true, filter)\n\t\tend\n\t\t\n\t\treturn hookmetamethod(object, method, hook)\n\tend\n\n\twax.shared.Hooking = Hooking\nend\n--#endregion\n\n--#region @include \"Src/Utils/SafePack.luau\" as \"wax.shared.SafePack\"\ndo\n\t--[[\n\t    SafePack\n\t    Author: centerepic\n\t]]\n\n\tlocal TableProxy = {}\n\n\tlocal UNPACK_CHUNK = 7997\n\tlocal SAFE_LIMIT = 12000\n\n\tfunction TableProxy.Pack(...)\n\t    return { n = select(\"#\", ...), ... }\n\tend\n\n\tfunction TableProxy.Unpack(Tbl, I, J)\n\t    I = I or 1\n\t    J = J or Tbl.n or #Tbl\n\n\t    if J - I + 1 > SAFE_LIMIT then\n\t        J = I + SAFE_LIMIT - 1\n\t    end\n\n\t    if J < I then\n\t        return\n\t    end\n\n\t    if J - I + 1 <= UNPACK_CHUNK then\n\t        return table.unpack(Tbl, I, J)\n\t    end\n\n\t    return Tbl[I], TableProxy.Unpack(Tbl, I + 1, J)\n\tend\n\n\twax.shared.SafePack = TableProxy\nend\n--#endregion\n\n--#region @include \"Src/Utils/Validation/Schema.luau\" as \"wax.shared.ValidationSchema\"\ndo\n\t--// Types \\\\--\n\ttype SchemaKind = \"Any\" | \"Type\" | \"Literal\" | \"Enum\" | \"Array\" | \"Object\" | \"Union\"\n\ttype Refinement = {\n\t\tPredicate: (any) -> boolean,\n\t\tMessage: string,\n\t}\n\ttype SchemaNode = {\n\t\tKind: SchemaKind,\n\t\tExpectedType: string?,\n\t\tLiteral: any?,\n\t\tValues: { any }?,\n\t\tItem: SchemaNode?,\n\t\tShape: { [any]: SchemaNode }?,\n\t\tSchemas: { SchemaNode }?,\n\t\tIsOptional: boolean?,\n\t\tHasDefault: boolean?,\n\t\tDefaultValue: any?,\n\t\tRefinements: { Refinement }?,\n\t\tMinimum: number?,\n\t\tMaximum: number?,\n\t\tInteger: boolean?,\n\t}\n\n\t--// Setup \\\\--\n\tlocal Node = {}\n\tNode.__index = Node\n\n\tlocal Schema = {}\n\n\t--// Helpers \\\\--\n\tlocal function CloneValue(Value)\n\t\tif type(Value) ~= \"table\" then\n\t\t\treturn Value\n\t\tend\n\n\t\tlocal Copy = {}\n\t\tfor Key, Child in Value do\n\t\t\tCopy[CloneValue(Key)] = CloneValue(Child)\n\t\tend\n\t\treturn Copy\n\tend\n\n\tlocal function CloneNode(self: SchemaNode): SchemaNode\n\t\tlocal Copy = table.clone(self)\n\t\tCopy.Refinements = self.Refinements and table.clone(self.Refinements) or nil\n\t\treturn setmetatable(Copy, Node) :: any\n\tend\n\n\tlocal function NewNode(Kind: SchemaKind, Data: { [any]: any }?): SchemaNode\n\t\tlocal NewSchema = Data and table.clone(Data) or {}\n\t\tNewSchema.Kind = Kind\n\t\treturn setmetatable(NewSchema, Node) :: any\n\tend\n\n\tlocal function AddError(Errors: { string }, Path: string, Message: string)\n\t\ttable.insert(Errors, `{Path}: {Message}`)\n\tend\n\n\tlocal function ChildPath(Path: string, Key: any): string\n\t\tif type(Key) == \"number\" then\n\t\t\treturn `{Path}[{Key}]`\n\t\tend\n\t\treturn Path == \"\" and tostring(Key) or `{Path}.{Key}`\n\tend\n\n\tlocal function IsSchema(Value): boolean\n\t\treturn type(Value) == \"table\" and getmetatable(Value) == Node\n\tend\n\n\tlocal function ValidateNode(CurrentSchema: SchemaNode, Value: any, Path: string, Errors: { string }): (boolean, any)\n\t\tif Value == nil then\n\t\t\tif CurrentSchema.HasDefault then\n\t\t\t\treturn true, CloneValue(CurrentSchema.DefaultValue)\n\t\t\tend\n\t\t\tif CurrentSchema.IsOptional then\n\t\t\t\treturn true, nil\n\t\t\tend\n\n\t\t\tAddError(Errors, Path, \"is required\")\n\t\t\treturn false, nil\n\t\tend\n\n\t\tlocal IsValid = true\n\t\tlocal Output = Value\n\t\tlocal Kind = CurrentSchema.Kind\n\n\t\tif Kind == \"Type\" then\n\t\t\tIsValid = typeof(Value) == CurrentSchema.ExpectedType\n\t\t\tif not IsValid then\n\t\t\t\tAddError(Errors, Path, `expected {CurrentSchema.ExpectedType}, got {typeof(Value)}`)\n\t\t\tend\n\t\telseif Kind == \"Literal\" then\n\t\t\tIsValid = Value == CurrentSchema.Literal\n\t\t\tif not IsValid then\n\t\t\t\tAddError(Errors, Path, `expected {tostring(CurrentSchema.Literal)}`)\n\t\t\tend\n\t\telseif Kind == \"Enum\" then\n\t\t\tIsValid = false\n\t\t\tfor _, Option in CurrentSchema.Values or {} do\n\t\t\t\tif Value == Option then\n\t\t\t\t\tIsValid = true\n\t\t\t\t\tbreak\n\t\t\t\tend\n\t\t\tend\n\t\t\tif not IsValid then\n\t\t\t\tlocal Options = {}\n\t\t\t\tfor _, Option in CurrentSchema.Values or {} do\n\t\t\t\t\ttable.insert(Options, tostring(Option))\n\t\t\t\tend\n\t\t\t\tAddError(Errors, Path, `expected one of {table.concat(Options, \", \")}`)\n\t\t\tend\n\t\telseif Kind == \"Array\" then\n\t\t\tif type(Value) ~= \"table\" then\n\t\t\t\tAddError(Errors, Path, `expected table, got {typeof(Value)}`)\n\t\t\t\tIsValid = false\n\t\t\telse\n\t\t\t\tOutput = {}\n\t\t\t\tfor Index, Child in Value do\n\t\t\t\t\tif type(Index) ~= \"number\" or Index % 1 ~= 0 or Index < 1 then\n\t\t\t\t\t\tAddError(Errors, Path, \"expected an array with positive integer keys\")\n\t\t\t\t\t\tIsValid = false\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tend\n\n\t\t\t\t\tlocal ChildValid, ChildOutput = ValidateNode(CurrentSchema.Item :: SchemaNode, Child, ChildPath(Path, Index), Errors)\n\t\t\t\t\tIsValid = ChildValid and IsValid\n\t\t\t\t\tif ChildValid then\n\t\t\t\t\t\tOutput[Index] = ChildOutput\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\t\telseif Kind == \"Object\" then\n\t\t\tif type(Value) ~= \"table\" then\n\t\t\t\tAddError(Errors, Path, `expected table, got {typeof(Value)}`)\n\t\t\t\tIsValid = false\n\t\t\telse\n\t\t\t\tOutput = {}\n\t\t\t\tfor Key, ChildSchema in CurrentSchema.Shape or {} do\n\t\t\t\t\tlocal ChildValid, ChildOutput = ValidateNode(ChildSchema, Value[Key], ChildPath(Path, Key), Errors)\n\t\t\t\t\tIsValid = ChildValid and IsValid\n\t\t\t\t\tif ChildOutput ~= nil then\n\t\t\t\t\t\tOutput[Key] = ChildOutput\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\t\telseif Kind == \"Union\" then\n\t\t\tIsValid = false\n\t\t\tfor _, ChildSchema in CurrentSchema.Schemas or {} do\n\t\t\t\tlocal ChildErrors = {}\n\t\t\t\tlocal ChildValid, ChildOutput = ValidateNode(ChildSchema, Value, Path, ChildErrors)\n\t\t\t\tif ChildValid then\n\t\t\t\t\tIsValid = true\n\t\t\t\t\tOutput = ChildOutput\n\t\t\t\t\tbreak\n\t\t\t\tend\n\t\t\tend\n\t\t\tif not IsValid then\n\t\t\t\tAddError(Errors, Path, \"did not match any allowed schema\")\n\t\t\tend\n\t\tend\n\n\t\tif not IsValid then\n\t\t\treturn false, nil\n\t\tend\n\n\t\tif type(Output) == \"number\" then\n\t\t\tif CurrentSchema.Integer and Output % 1 ~= 0 then\n\t\t\t\tAddError(Errors, Path, \"expected an integer\")\n\t\t\t\tIsValid = false\n\t\t\tend\n\t\t\tif CurrentSchema.Minimum ~= nil and Output < CurrentSchema.Minimum then\n\t\t\t\tAddError(Errors, Path, `must be at least {CurrentSchema.Minimum}`)\n\t\t\t\tIsValid = false\n\t\t\tend\n\t\t\tif CurrentSchema.Maximum ~= nil and Output > CurrentSchema.Maximum then\n\t\t\t\tAddError(Errors, Path, `must be at most {CurrentSchema.Maximum}`)\n\t\t\t\tIsValid = false\n\t\t\tend\n\t\tend\n\n\t\tfor _, Refinement in CurrentSchema.Refinements or {} do\n\t\t\tlocal Success, Result = pcall(Refinement.Predicate, Output)\n\t\t\tif not Success or not Result then\n\t\t\t\tAddError(Errors, Path, Refinement.Message)\n\t\t\t\tIsValid = false\n\t\t\tend\n\t\tend\n\n\t\tif not IsValid then\n\t\t\treturn false, nil\n\t\tend\n\t\treturn true, Output\n\tend\n\n\t--// Modifiers \\\\--\n\tfunction Node:optional(): SchemaNode\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.IsOptional = true\n\t\treturn Copy\n\tend\n\n\tfunction Node:default(Value: any): SchemaNode\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.HasDefault = true\n\t\tCopy.DefaultValue = Value\n\t\treturn Copy\n\tend\n\n\tfunction Node:refine(Predicate: (any) -> boolean, Message: string?): SchemaNode\n\t\tassert(type(Predicate) == \"function\", \"Schema refinement must be a function\")\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.Refinements = Copy.Refinements or {}\n\t\ttable.insert(Copy.Refinements, {\n\t\t\tPredicate = Predicate,\n\t\t\tMessage = Message or \"failed refinement\",\n\t\t})\n\t\treturn Copy\n\tend\n\n\tfunction Node:integer(): SchemaNode\n\t\tassert(self.Kind == \"Type\" and self.ExpectedType == \"number\", \"integer() can only be used on number schemas\")\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.Integer = true\n\t\treturn Copy\n\tend\n\n\tfunction Node:min(Value: number): SchemaNode\n\t\tassert(self.Kind == \"Type\" and self.ExpectedType == \"number\", \"min() can only be used on number schemas\")\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.Minimum = Value\n\t\treturn Copy\n\tend\n\n\tfunction Node:max(Value: number): SchemaNode\n\t\tassert(self.Kind == \"Type\" and self.ExpectedType == \"number\", \"max() can only be used on number schemas\")\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.Maximum = Value\n\t\treturn Copy\n\tend\n\n\t--// Constructors \\\\--\n\tfunction Schema.any(): SchemaNode\n\t\treturn NewNode(\"Any\")\n\tend\n\n\tfunction Schema.type(ExpectedType: string): SchemaNode\n\t\tassert(type(ExpectedType) == \"string\", \"Schema type must be a string\")\n\t\treturn NewNode(\"Type\", { ExpectedType = ExpectedType })\n\tend\n\n\tfunction Schema.string(): SchemaNode\n\t\treturn Schema.type(\"string\")\n\tend\n\n\tfunction Schema.number(): SchemaNode\n\t\treturn Schema.type(\"number\")\n\tend\n\n\tfunction Schema.boolean(): SchemaNode\n\t\treturn Schema.type(\"boolean\")\n\tend\n\n\tfunction Schema.table(): SchemaNode\n\t\treturn Schema.type(\"table\")\n\tend\n\n\tfunction Schema.callback(): SchemaNode\n\t\treturn Schema.type(\"function\")\n\tend\n\n\tfunction Schema.instance(ClassName: string?): SchemaNode\n\t\tlocal InstanceSchema = Schema.type(\"Instance\")\n\t\tif ClassName then\n\t\t\treturn InstanceSchema:refine(function(Value)\n\t\t\t\treturn Value:IsA(ClassName)\n\t\t\tend, `expected an Instance that is a {ClassName}`)\n\t\tend\n\t\treturn InstanceSchema\n\tend\n\n\tfunction Schema.literal(Value: any): SchemaNode\n\t\tassert(Value ~= nil, \"Schema literal cannot be nil; use optional() instead\")\n\t\treturn NewNode(\"Literal\", { Literal = Value })\n\tend\n\n\tfunction Schema.enum(Values: { any }): SchemaNode\n\t\tassert(type(Values) == \"table\" and #Values > 0, \"Schema enum requires at least one value\")\n\t\treturn NewNode(\"Enum\", { Values = table.clone(Values) })\n\tend\n\n\tfunction Schema.array(ItemSchema: SchemaNode): SchemaNode\n\t\tassert(IsSchema(ItemSchema), \"Schema array requires an item schema\")\n\t\treturn NewNode(\"Array\", { Item = ItemSchema })\n\tend\n\n\tfunction Schema.object(Shape: { [any]: SchemaNode }): SchemaNode\n\t\tassert(type(Shape) == \"table\", \"Schema object requires a shape\")\n\t\tfor Key, ChildSchema in Shape do\n\t\t\tassert(IsSchema(ChildSchema), `Schema object field {tostring(Key)} must be a schema`)\n\t\tend\n\t\treturn NewNode(\"Object\", { Shape = table.clone(Shape) })\n\tend\n\n\tfunction Schema.union(Schemas: { SchemaNode }): SchemaNode\n\t\tassert(type(Schemas) == \"table\" and #Schemas > 0, \"Schema union requires at least one schema\")\n\t\tfor _, ChildSchema in Schemas do\n\t\t\tassert(IsSchema(ChildSchema), \"Schema union entries must be schemas\")\n\t\tend\n\t\treturn NewNode(\"Union\", { Schemas = table.clone(Schemas) })\n\tend\n\n\t--// Validation \\\\--\n\tfunction Schema.Validate(DataSchema: SchemaNode, Value: any): (boolean, any, { string })\n\t\tassert(IsSchema(DataSchema), \"ValidateSchema requires a schema created by Validation.Schema\")\n\t\tlocal Errors = {}\n\t\tlocal IsValid, Output = ValidateNode(DataSchema, Value, \"Value\", Errors)\n\t\treturn IsValid, Output, Errors\n\tend\n\n\twax.shared.ValidationSchema = Schema\nend\n--#endregion\n\n--#region @include \"Src/Utils/Validation/init.luau\" as \"wax.shared.Validation\"\ndo\n\t--// Imports \\\\--\n\tlocal Schema = wax.shared.ValidationSchema or require(script.Schema)\n\n\t--// Module \\\\--\n\tlocal Validation = {\n\t\tSchema = Schema,\n\t}\n\n\t--// Functions \\\\--\n\tfunction Validation.FillTemplate(Data, Template)\n\t\tlocal NewData = {}\n\t\tfor Key, Value in Template do\n\t\t\tif Data[Key] == nil or typeof(Data[Key]) ~= typeof(Value) then\n\t\t\t\tNewData[Key] = Value\n\t\t\telse\n\t\t\t\tNewData[Key] = Data[Key]\n\t\t\tend\n\t\tend\n\n\t\treturn NewData\n\tend\n\n\tfunction Validation.ValidateSchema(Data, DataSchema)\n\t\treturn Schema.Validate(DataSchema, Data)\n\tend\n\n\twax.shared.Validation = Validation\nend\n--#endregion\n\n--#region @include \"Src/Utils/CallFilter/Operators.luau\" as \"wax.shared.CallFilterOperators\"\ndo\n\tlocal Operators = {}\n\n\tlocal Registry = {\n\t\tEquals = {\n\t\t\tText = \"==\",\n\t\t\tAllowedTypes = { boolean = true, number = true, string = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn Value == Expected\n\t\t\tend,\n\t\t},\n\t\tNotEquals = {\n\t\t\tText = \"~=\",\n\t\t\tAllowedTypes = { boolean = true, number = true, string = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn Value ~= Expected\n\t\t\tend,\n\t\t},\n\t\tLessThan = {\n\t\t\tText = \"<\",\n\t\t\tNumericComparison = true,\n\t\t\tAllowedTypes = { number = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"number\" and typeof(Expected) == \"number\" and Value < Expected\n\t\t\tend,\n\t\t},\n\t\tLessThanOrEqual = {\n\t\t\tText = \"<=\",\n\t\t\tNumericComparison = true,\n\t\t\tAllowedTypes = { number = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"number\" and typeof(Expected) == \"number\" and Value <= Expected\n\t\t\tend,\n\t\t},\n\t\tGreaterThan = {\n\t\t\tText = \">\",\n\t\t\tNumericComparison = true,\n\t\t\tAllowedTypes = { number = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"number\" and typeof(Expected) == \"number\" and Value > Expected\n\t\t\tend,\n\t\t},\n\t\tGreaterThanOrEqual = {\n\t\t\tText = \">=\",\n\t\t\tNumericComparison = true,\n\t\t\tAllowedTypes = { number = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"number\" and typeof(Expected) == \"number\" and Value >= Expected\n\t\t\tend,\n\t\t},\n\t\tContains = {\n\t\t\tText = \"Contains\",\n\t\t\tSummaryText = \"contains\",\n\t\t\tAllowedTypes = { string = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"string\"\n\t\t\t\t\tand typeof(Expected) == \"string\"\n\t\t\t\t\tand string.find(Value, Expected, 1, true) ~= nil\n\t\t\tend,\n\t\t},\n\t\tStartsWith = {\n\t\t\tText = \"Starts with\",\n\t\t\tSummaryText = \"starts with\",\n\t\t\tAllowedTypes = { string = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"string\"\n\t\t\t\t\tand typeof(Expected) == \"string\"\n\t\t\t\t\tand string.sub(Value, 1, #Expected) == Expected\n\t\t\tend,\n\t\t},\n\t\tEndsWith = {\n\t\t\tText = \"Ends with\",\n\t\t\tSummaryText = \"ends with\",\n\t\t\tAllowedTypes = { string = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"string\"\n\t\t\t\t\tand typeof(Expected) == \"string\"\n\t\t\t\t\tand (Expected == \"\" or string.sub(Value, -#Expected) == Expected)\n\t\t\tend,\n\t\t},\n\t\tTypeIs = {\n\t\t\tText = \"Type\",\n\t\t\tSummaryText = \"type\",\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == tostring(Expected)\n\t\t\tend,\n\t\t},\n\t}\n\n\tlocal Order = {\n\t\t\"Equals\",\n\t\t\"NotEquals\",\n\t\t\"LessThan\",\n\t\t\"LessThanOrEqual\",\n\t\t\"GreaterThan\",\n\t\t\"GreaterThanOrEqual\",\n\t\t\"Contains\",\n\t\t\"StartsWith\",\n\t\t\"EndsWith\",\n\t\t\"TypeIs\",\n\t}\n\n\tlocal TypeNames = {\n\t\t\"nil\",\n\t\t\"boolean\",\n\t\t\"number\",\n\t\t\"string\",\n\t\t\"table\",\n\t\t\"function\",\n\t\t\"thread\",\n\t\t\"userdata\",\n\t\t\"Instance\",\n\t\t\"EnumItem\",\n\t\t\"RBXScriptSignal\",\n\t\t\"RBXScriptConnection\",\n\t\t\"Vector2\",\n\t\t\"Vector3\",\n\t\t\"CFrame\",\n\t\t\"Color3\",\n\t\t\"BrickColor\",\n\t\t\"UDim\",\n\t\t\"UDim2\",\n\t\t\"Rect\",\n\t\t\"Ray\",\n\t\t\"buffer\",\n\t}\n\n\tlocal TypeNameLookup = {}\n\tfor _, TypeName in TypeNames do\n\t\tTypeNameLookup[TypeName] = true\n\tend\n\n\tlocal function GetSubjectKey(Subject): string\n\t\treturn if Subject.Type == \"ArgumentCount\" then \"ArgumentCount\" else `Argument:{Subject.Index}`\n\tend\n\n\tlocal function FormatSubject(Subject): string\n\t\treturn if Subject.Type == \"ArgumentCount\" then \"#Arg\" else `Arg[{Subject.Index}]`\n\tend\n\n\tlocal function GetAndGroupRange(Conditions, Condition)\n\t\tlocal ConditionIndex = table.find(Conditions, Condition)\n\t\tif not ConditionIndex then\n\t\t\treturn 1, #Conditions\n\t\tend\n\n\t\tlocal FirstIndex = 1\n\t\tfor Index = ConditionIndex, 2, -1 do\n\t\t\tif Conditions[Index].Join == \"Or\" then\n\t\t\t\tFirstIndex = Index\n\t\t\t\tbreak\n\t\t\tend\n\t\tend\n\n\t\tlocal LastIndex = #Conditions\n\t\tfor Index = ConditionIndex + 1, #Conditions do\n\t\t\tif Conditions[Index].Join == \"Or\" then\n\t\t\t\tLastIndex = Index - 1\n\t\t\t\tbreak\n\t\t\tend\n\t\tend\n\n\t\treturn FirstIndex, LastIndex\n\tend\n\n\tlocal function FormatValue(Value): string\n\t\treturn if typeof(Value) == \"string\" then `\"{Value}\"` else tostring(Value)\n\tend\n\n\tfunction Operators.Get(Operator)\n\t\treturn Registry[Operator]\n\tend\n\n\tfunction Operators.GetOptions()\n\t\tlocal Options = {}\n\t\tfor _, Operator in Order do\n\t\t\tlocal Definition = Registry[Operator]\n\t\t\ttable.insert(Options, {\n\t\t\t\tValue = Operator,\n\t\t\t\tText = Definition.Text,\n\t\t\t})\n\t\tend\n\t\treturn Options\n\tend\n\n\tfunction Operators.GetTypeNames()\n\t\treturn table.clone(TypeNames)\n\tend\n\n\tfunction Operators.IsTypeName(Value): boolean\n\t\treturn type(Value) == \"string\" and TypeNameLookup[Value] == true\n\tend\n\n\tfunction Operators.GetText(Operator, Summary: boolean?): string\n\t\tlocal Definition = Registry[Operator]\n\t\tif not Definition then\n\t\t\treturn tostring(Operator)\n\t\tend\n\t\treturn Summary and Definition.SummaryText or Definition.Text\n\tend\n\n\tfunction Operators.FormatValue(Value): string\n\t\treturn FormatValue(Value)\n\tend\n\n\tfunction Operators.IsNumericComparison(Operator): boolean\n\t\tlocal Definition = Registry[Operator]\n\t\treturn Definition ~= nil and Definition.NumericComparison == true\n\tend\n\n\tfunction Operators.Evaluate(Operator, Value, Expected): boolean\n\t\tlocal Definition = Registry[Operator]\n\t\treturn Definition ~= nil and Definition.Evaluate(Value, Expected) or false\n\tend\n\n\tfunction Operators.ResolveSubject(Subject, Arguments)\n\t\tif Subject.Type == \"ArgumentCount\" then\n\t\t\treturn Arguments.n or #Arguments\n\t\tend\n\n\t\treturn Arguments[Subject.Index]\n\tend\n\n\tfunction Operators.MatchesCondition(Condition, Arguments): boolean\n\t\treturn Operators.Evaluate(Condition.Operator, Operators.ResolveSubject(Condition.Subject, Arguments), Condition.Value)\n\tend\n\n\tfunction Operators.Matches(Conditions, ResolveValue): boolean\n\t\tif #Conditions == 0 then\n\t\t\treturn true\n\t\tend\n\n\t\tlocal AnyGroupMatches = false\n\t\tlocal CurrentGroupMatches = Operators.Evaluate(\n\t\t\tConditions[1].Operator,\n\t\t\tResolveValue(Conditions[1]),\n\t\t\tConditions[1].Value\n\t\t)\n\t\tfor Index = 2, #Conditions do\n\t\t\tlocal Condition = Conditions[Index]\n\t\t\tlocal Matches = Operators.Evaluate(Condition.Operator, ResolveValue(Condition), Condition.Value)\n\t\t\tif Condition.Join == \"Or\" then\n\t\t\t\tAnyGroupMatches = AnyGroupMatches or CurrentGroupMatches\n\t\t\t\tCurrentGroupMatches = Matches\n\t\t\telse\n\t\t\t\tCurrentGroupMatches = CurrentGroupMatches and Matches\n\t\t\tend\n\t\tend\n\n\t\treturn AnyGroupMatches or CurrentGroupMatches\n\tend\n\n\tfunction Operators.MatchesConditions(Conditions, Arguments): boolean\n\t\treturn Operators.Matches(Conditions, function(Condition)\n\t\t\treturn Operators.ResolveSubject(Condition.Subject, Arguments)\n\t\tend)\n\tend\n\n\tfunction Operators.GetConditionType(Conditions, Condition): string?\n\t\tif Condition.Subject.Type == \"ArgumentCount\" then\n\t\t\treturn \"number\"\n\t\tend\n\n\t\tlocal SubjectKey = GetSubjectKey(Condition.Subject)\n\t\tlocal FirstIndex, LastIndex = GetAndGroupRange(Conditions, Condition)\n\t\tfor Index = FirstIndex, LastIndex do\n\t\t\tlocal OtherCondition = Conditions[Index]\n\t\t\tif\n\t\t\t\tOtherCondition ~= Condition\n\t\t\t\tand GetSubjectKey(OtherCondition.Subject) == SubjectKey\n\t\t\t\tand OtherCondition.Operator == \"TypeIs\"\n\t\t\tthen\n\t\t\t\treturn tostring(OtherCondition.Value)\n\t\t\tend\n\t\tend\n\n\t\tif Condition.Operator == \"TypeIs\" then\n\t\t\treturn tostring(Condition.Value)\n\t\tend\n\n\t\tlocal ValueType = typeof(Condition.Value)\n\t\tif ValueType == \"boolean\" or ValueType == \"number\" then\n\t\t\treturn ValueType\n\t\tend\n\n\t\tfor Index = FirstIndex, LastIndex do\n\t\t\tlocal OtherCondition = Conditions[Index]\n\t\t\tlocal OtherValueType = typeof(OtherCondition.Value)\n\t\t\tif\n\t\t\t\tOtherCondition ~= Condition\n\t\t\t\tand GetSubjectKey(OtherCondition.Subject) == SubjectKey\n\t\t\t\tand (OtherValueType == \"boolean\" or OtherValueType == \"number\")\n\t\t\tthen\n\t\t\t\treturn OtherValueType\n\t\t\tend\n\t\tend\n\n\t\treturn if ValueType == \"string\" then \"string\" else nil\n\tend\n\n\tfunction Operators.IsAllowed(Conditions, Condition, Operator): boolean\n\t\tif Operator == \"TypeIs\" then\n\t\t\treturn Condition.Subject.Type == \"Argument\"\n\t\tend\n\n\t\tlocal Definition = Registry[Operator]\n\t\tif not Definition then\n\t\t\treturn false\n\t\tend\n\n\t\tlocal ConditionType = Operators.GetConditionType(Conditions, Condition)\n\t\treturn ConditionType == nil or Definition.AllowedTypes[ConditionType] == true\n\tend\n\n\tfunction Operators.IsConditionValid(Conditions, Condition): boolean\n\t\tlocal Definition = Registry[Condition.Operator]\n\t\tif not Definition then\n\t\t\treturn false\n\t\tend\n\n\t\tif Condition.Operator == \"TypeIs\" then\n\t\t\treturn Condition.Subject.Type == \"Argument\" and Operators.IsTypeName(Condition.Value)\n\t\tend\n\n\t\tlocal ConditionType = Operators.GetConditionType(Conditions, Condition)\n\t\treturn ConditionType ~= nil\n\t\t\tand Definition.AllowedTypes ~= nil\n\t\t\tand Definition.AllowedTypes[ConditionType] == true\n\t\t\tand typeof(Condition.Value) == ConditionType\n\tend\n\n\tlocal function NumericConditionsConflict(First, Second): boolean\n\t\tif typeof(First.Value) ~= \"number\" or typeof(Second.Value) ~= \"number\" then\n\t\t\treturn false\n\t\tend\n\n\t\tif First.Operator == \"Equals\" and Operators.IsNumericComparison(Second.Operator) then\n\t\t\treturn not Operators.Evaluate(Second.Operator, First.Value, Second.Value)\n\t\telseif Second.Operator == \"Equals\" and Operators.IsNumericComparison(First.Operator) then\n\t\t\treturn not Operators.Evaluate(First.Operator, Second.Value, First.Value)\n\t\telseif not Operators.IsNumericComparison(First.Operator) or not Operators.IsNumericComparison(Second.Operator) then\n\t\t\treturn false\n\t\tend\n\n\t\tlocal FirstIsLower = First.Operator == \"GreaterThan\" or First.Operator == \"GreaterThanOrEqual\"\n\t\tlocal SecondIsLower = Second.Operator == \"GreaterThan\" or Second.Operator == \"GreaterThanOrEqual\"\n\t\tif FirstIsLower == SecondIsLower then\n\t\t\treturn false\n\t\tend\n\n\t\tlocal Lower = if FirstIsLower then First else Second\n\t\tlocal Upper = if FirstIsLower then Second else First\n\t\treturn Lower.Value > Upper.Value\n\t\t\tor Lower.Value == Upper.Value and (Lower.Operator == \"GreaterThan\" or Upper.Operator == \"LessThan\")\n\tend\n\n\tlocal function AreInSameAndBranch(Conditions, FirstIndex: number, SecondIndex: number): boolean\n\t\tfor Index = FirstIndex + 1, SecondIndex do\n\t\t\tif Conditions[Index].Join == \"Or\" then\n\t\t\t\treturn false\n\t\t\tend\n\t\tend\n\t\treturn true\n\tend\n\n\tfunction Operators.Validate(Conditions, Adapter)\n\t\tlocal Errors = {}\n\t\tlocal Conflicts = {}\n\t\tlocal GetKey = Adapter and Adapter.GetKey or function(Condition)\n\t\t\treturn GetSubjectKey(Condition.Subject)\n\t\tend\n\t\tlocal GetLabel = Adapter and Adapter.GetLabel or function(Condition)\n\t\t\treturn FormatSubject(Condition.Subject)\n\t\tend\n\t\tlocal IsConditionValid = Adapter and Adapter.IsConditionValid or function(Condition)\n\t\t\treturn Operators.IsConditionValid(Conditions, Condition)\n\t\tend\n\n\t\tlocal function AddConflict(FirstIndex: number, SecondIndex: number, Message: string)\n\t\t\tConflicts[FirstIndex] = true\n\t\t\tConflicts[SecondIndex] = true\n\t\t\ttable.insert(Errors, Message)\n\t\tend\n\n\t\tfor Index, Condition in Conditions do\n\t\t\tif not IsConditionValid(Condition) then\n\t\t\t\tConflicts[Index] = true\n\t\t\t\ttable.insert(\n\t\t\t\t\tErrors,\n\t\t\t\t\t`{GetLabel(Condition)} has a value that is incompatible with {Operators.GetText(Condition.Operator, true)}.`\n\t\t\t\t)\n\t\t\tend\n\t\tend\n\n\t\tfor FirstIndex = 1, #Conditions do\n\t\t\tlocal First = Conditions[FirstIndex]\n\t\t\tfor SecondIndex = FirstIndex + 1, #Conditions do\n\t\t\t\tlocal Second = Conditions[SecondIndex]\n\t\t\t\tif Conflicts[FirstIndex] or Conflicts[SecondIndex] then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\t\t\t\tif GetKey(First) ~= GetKey(Second) or not AreInSameAndBranch(Conditions, FirstIndex, SecondIndex) then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\t\t\t\tlocal SubjectText = GetLabel(First)\n\n\t\t\t\tif First.Operator == \"Equals\" and Second.Operator == \"Equals\" and First.Value ~= Second.Value then\n\t\t\t\t\tAddConflict(FirstIndex, SecondIndex, `{SubjectText} cannot equal both {FormatValue(First.Value)} and {FormatValue(Second.Value)}.`)\n\t\t\t\telseif\n\t\t\t\t\tFirst.Operator == \"Equals\" and Second.Operator == \"NotEquals\" and First.Value == Second.Value\n\t\t\t\t\tor First.Operator == \"NotEquals\" and Second.Operator == \"Equals\" and First.Value == Second.Value\n\t\t\t\tthen\n\t\t\t\t\tAddConflict(FirstIndex, SecondIndex, `{SubjectText} cannot both equal and not equal {FormatValue(First.Value)}.`)\n\t\t\t\telseif First.Operator == \"TypeIs\" and Second.Operator == \"TypeIs\" and First.Value ~= Second.Value then\n\t\t\t\t\tAddConflict(FirstIndex, SecondIndex, `{SubjectText} cannot have both type {First.Value} and {Second.Value}.`)\n\t\t\t\telseif NumericConditionsConflict(First, Second) then\n\t\t\t\t\tAddConflict(FirstIndex, SecondIndex, `{SubjectText} cannot satisfy both numeric comparisons.`)\n\t\t\t\telse\n\t\t\t\t\tlocal TypeCondition\n\t\t\t\t\tlocal OtherCondition\n\t\t\t\t\tif First.Operator == \"TypeIs\" then\n\t\t\t\t\t\tTypeCondition, OtherCondition = First, Second\n\t\t\t\t\telseif Second.Operator == \"TypeIs\" then\n\t\t\t\t\t\tTypeCondition, OtherCondition = Second, First\n\t\t\t\t\tend\n\n\t\t\t\t\tif TypeCondition and OtherCondition and OtherCondition.Operator ~= \"TypeIs\" then\n\t\t\t\t\t\tlocal Definition = Registry[OtherCondition.Operator]\n\t\t\t\t\t\tlocal TypeName = tostring(TypeCondition.Value)\n\t\t\t\t\t\tif Definition and Definition.AllowedTypes and not Definition.AllowedTypes[TypeName] then\n\t\t\t\t\t\t\tAddConflict(FirstIndex, SecondIndex, `{SubjectText} has type {TypeName}, so it cannot use {Definition.SummaryText or Definition.Text}.`)\n\t\t\t\t\t\tend\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\t\tend\n\n\t\treturn #Errors == 0, Errors, Conflicts\n\tend\n\n\twax.shared.CallFilterOperators = Operators\nend\n--#endregion\n\n--#region @include \"Src/Utils/CallFilter/RemoteFields.luau\" as \"wax.shared.CallFilterRemoteFields\"\ndo\n\tlocal Operators = wax.shared.CallFilterOperators or require(\"@src/Utils/CallFilter/Operators\")\n\n\tlocal RemoteFields = {}\n\n\tlocal RemoteClassOptions = {\n\t\t{ Value = \"RemoteEvent\", Text = \"RemoteEvent\" },\n\t\t{ Value = \"RemoteFunction\", Text = \"RemoteFunction\" },\n\t\t{ Value = \"UnreliableRemoteEvent\", Text = \"UnreliableRemoteEvent\" },\n\t\t{ Value = \"BindableEvent\", Text = \"BindableEvent\" },\n\t\t{ Value = \"BindableFunction\", Text = \"BindableFunction\" },\n\t}\n\n\tlocal Registry = {\n\t\tName = {\n\t\t\tText = \"Name\",\n\t\t\tGetValue = function(Remote)\n\t\t\t\treturn Remote.Name\n\t\t\tend,\n\t\t},\n\t\tClassName = {\n\t\t\tText = \"Class\",\n\t\t\tValueOptions = RemoteClassOptions,\n\t\t\tGetValue = function(Remote)\n\t\t\t\treturn Remote.ClassName\n\t\t\tend,\n\t\t},\n\t\tFullName = {\n\t\t\tText = \"Full path\",\n\t\t\tGetValue = function(Remote)\n\t\t\t\tlocal Success, Result = pcall(Remote.GetFullName, Remote)\n\t\t\t\treturn Success and Result or Remote.Name\n\t\t\tend,\n\t\t},\n\t}\n\n\tlocal Order = { \"Name\", \"ClassName\", \"FullName\" }\n\tlocal StringOperators = {\n\t\tEquals = true,\n\t\tNotEquals = true,\n\t\tContains = true,\n\t\tStartsWith = true,\n\t\tEndsWith = true,\n\t}\n\n\tfunction RemoteFields.Get(Field)\n\t\treturn Registry[Field]\n\tend\n\n\tfunction RemoteFields.GetOptions()\n\t\tlocal Options = {}\n\t\tfor _, Field in Order do\n\t\t\ttable.insert(Options, {\n\t\t\t\tValue = Field,\n\t\t\t\tText = Registry[Field].Text,\n\t\t\t})\n\t\tend\n\t\treturn Options\n\tend\n\n\tfunction RemoteFields.GetNames()\n\t\treturn table.clone(Order)\n\tend\n\n\tfunction RemoteFields.GetText(Field): string\n\t\tlocal Definition = Registry[Field]\n\t\treturn Definition and Definition.Text or tostring(Field)\n\tend\n\n\tfunction RemoteFields.GetValueOptions(Field)\n\t\tlocal Definition = Registry[Field]\n\t\treturn Definition and Definition.ValueOptions and table.clone(Definition.ValueOptions) or nil\n\tend\n\n\tfunction RemoteFields.IsValueAllowed(Field, Value): boolean\n\t\tlocal Options = RemoteFields.GetValueOptions(Field)\n\t\tif not Options then\n\t\t\treturn typeof(Value) == \"string\"\n\t\tend\n\n\t\tfor _, Option in Options do\n\t\t\tif Option.Value == Value then\n\t\t\t\treturn true\n\t\t\tend\n\t\tend\n\t\treturn false\n\tend\n\n\tfunction RemoteFields.IsOperatorAllowed(Operator, Field): boolean\n\t\tif Field == \"ClassName\" then\n\t\t\treturn Operator == \"Equals\" or Operator == \"NotEquals\"\n\t\tend\n\t\treturn StringOperators[Operator] == true\n\tend\n\n\tfunction RemoteFields.IsConditionValid(Condition): boolean\n\t\treturn Registry[Condition.Field] ~= nil\n\t\t\tand RemoteFields.IsOperatorAllowed(Condition.Operator, Condition.Field)\n\t\t\tand RemoteFields.IsValueAllowed(Condition.Field, Condition.Value)\n\tend\n\n\tfunction RemoteFields.Validate(Conditions)\n\t\treturn Operators.Validate(Conditions, {\n\t\t\tGetKey = function(Condition)\n\t\t\t\treturn Condition.Field\n\t\t\tend,\n\t\t\tGetLabel = function(Condition)\n\t\t\t\treturn RemoteFields.GetText(Condition.Field)\n\t\t\tend,\n\t\t\tIsConditionValid = RemoteFields.IsConditionValid,\n\t\t})\n\tend\n\n\tfunction RemoteFields.Matches(Conditions, Remote): boolean\n\t\treturn Operators.Matches(Conditions, function(Condition)\n\t\t\tlocal Definition = Registry[Condition.Field]\n\t\t\treturn Definition and Definition.GetValue(Remote) or nil\n\t\tend)\n\tend\n\n\twax.shared.CallFilterRemoteFields = RemoteFields\nend\n--#endregion\n\n--#region @include \"Src/Utils/CallFilter/Schema.luau\" as \"wax.shared.CallFilterSchema\"\ndo\n\t--// Imports \\\\--\n\tlocal Validation = wax.shared.Validation or require(\"@src/Utils/Validation\")\n\tlocal Operators = wax.shared.CallFilterOperators or require(\"@src/Utils/CallFilter/Operators\")\n\tlocal RemoteFields = wax.shared.CallFilterRemoteFields or require(\"@src/Utils/CallFilter/RemoteFields\")\n\n\tlocal Schema = Validation.Schema\n\n\t--// Helpers \\\\--\n\tlocal function GetOperatorNames()\n\t\tlocal Names = {}\n\t\tfor _, Option in Operators.GetOptions() do\n\t\t\ttable.insert(Names, Option.Value)\n\t\tend\n\t\treturn Names\n\tend\n\n\tlocal function IsConditionValueValid(Condition): boolean\n\t\treturn Operators.IsConditionValid({ Condition }, Condition)\n\tend\n\n\tlocal function HasNoConditionConflicts(Conditions): boolean\n\t\treturn Operators.Validate(Conditions)\n\tend\n\n\t--// Schemas \\\\--\n\tlocal Remote = Schema.instance():refine(function(Value)\n\t\treturn RemoteFields.IsValueAllowed(\"ClassName\", Value.ClassName)\n\tend, \"must be a supported remote\")\n\n\tlocal Subject = Schema.object({\n\t\tType = Schema.enum({ \"Argument\", \"ArgumentCount\" }),\n\t\tIndex = Schema.number():integer():min(1):optional(),\n\t}):refine(function(Value)\n\t\treturn Value.Type == \"ArgumentCount\" and Value.Index == nil or Value.Type == \"Argument\" and Value.Index ~= nil\n\tend, \"must provide an index only for argument subjects\")\n\n\tlocal Condition = Schema.object({\n\t\tSubject = Subject,\n\t\tOperator = Schema.enum(GetOperatorNames()),\n\t\tValue = Schema.any():optional(),\n\t\tJoin = Schema.enum({ \"And\", \"Or\" }):optional(),\n\t}):refine(IsConditionValueValid, \"has a value that is incompatible with its operator\")\n\n\tlocal ConditionArray = Schema.array(Condition):refine(HasNoConditionConflicts, \"contains conflicting conditions\")\n\tlocal Conditions = ConditionArray:default({})\n\n\tlocal RemoteCondition = Schema.object({\n\t\tField = Schema.enum(RemoteFields.GetNames()),\n\t\tOperator = Schema.enum(GetOperatorNames()),\n\t\tValue = Schema.string(),\n\t\tJoin = Schema.enum({ \"And\", \"Or\" }):optional(),\n\t}):refine(RemoteFields.IsConditionValid, \"has an operator or value that is incompatible with its field\")\n\n\tlocal RemoteConditions = Schema.array(RemoteCondition):refine(function(Value)\n\t\treturn #Value > 0 and RemoteFields.Validate(Value)\n\tend, \"must contain at least one non-conflicting remote condition\")\n\n\tlocal Target = Schema.union({\n\t\tSchema.object({\n\t\t\tType = Schema.literal(\"Instance\"),\n\t\t\tRemote = Remote,\n\t\t}),\n\t\tSchema.object({\n\t\t\tType = Schema.literal(\"Query\"),\n\t\t\tConditions = RemoteConditions,\n\t\t}),\n\t})\n\n\tlocal Filter = Schema.object({\n\t\tId = Schema.string():optional(),\n\t\tEnabled = Schema.boolean():default(true),\n\t\tTarget = Target,\n\t\tDirection = Schema.enum({ \"Outgoing\", \"Incoming\", \"Any\" }),\n\t\tConditions = Conditions,\n\t\tAction = Schema.enum({ \"Ignore\", \"Block\", \"Highlight\" }):default(\"Ignore\"),\n\t})\n\n\tlocal Update = Schema.object({\n\t\tEnabled = Schema.boolean():optional(),\n\t\tTarget = Target:optional(),\n\t\tDirection = Schema.enum({ \"Outgoing\", \"Incoming\", \"Any\" }):optional(),\n\t\tConditions = ConditionArray:optional(),\n\t\tAction = Schema.enum({ \"Ignore\", \"Block\", \"Highlight\" }):optional(),\n\t})\n\n\twax.shared.CallFilterSchema = {\n\t\tRemote = Remote,\n\t\tSubject = Subject,\n\t\tCondition = Condition,\n\t\tConditions = Conditions,\n\t\tRemoteCondition = RemoteCondition,\n\t\tRemoteConditions = RemoteConditions,\n\t\tTarget = Target,\n\t\tFilter = Filter,\n\t\tUpdate = Update,\n\t}\nend\n--#endregion\n\n--#region @include \"Src/Utils/CallFilter/Manager.luau\" as \"wax.shared.CallFilters\"\ndo\n\tlocal Operators = wax.shared.CallFilterOperators or require(\"@src/Utils/CallFilter/Operators\")\n\tlocal InstanceSerializer = wax.shared.InstanceSerializer or require(\"@src/Utils/CodeGen/Serializer/Instance\")\n\tlocal Validation = wax.shared.Validation or require(\"@src/Utils/Validation\")\n\tlocal CallFilterSchema = wax.shared.CallFilterSchema or require(\"@src/Utils/CallFilter/Schema\")\n\tlocal RemoteFields = wax.shared.CallFilterRemoteFields or require(\"@src/Utils/CallFilter/RemoteFields\")\n\n\tlocal CallFilters = {\n\t\tItems = {},\n\t\tById = {},\n\t\tListeners = {},\n\t}\n\n\tlocal ActionPriorities = {\n\t\tHighlight = 1,\n\t\tIgnore = 2,\n\t\tBlock = 3,\n\t}\n\n\tlocal function Validate(Data, DataSchema, Context: string)\n\t\tlocal IsValid, Result, Errors = Validation.ValidateSchema(Data, DataSchema)\n\t\tassert(IsValid, `{Context}: {Errors[1] or \"validation failed\"}`)\n\t\treturn Result\n\tend\n\n\tlocal function CopyFilter(Filter)\n\t\tlocal Copy = table.clone(Filter)\n\t\tCopy.Conditions = {}\n\n\t\tfor _, Condition in Filter.Conditions or {} do\n\t\t\tlocal ConditionCopy = table.clone(Condition)\n\t\t\tConditionCopy.Subject = table.clone(Condition.Subject)\n\t\t\ttable.insert(Copy.Conditions, ConditionCopy)\n\t\tend\n\n\t\tCopy.Target = table.clone(Filter.Target)\n\t\tif Filter.Target.Type == \"Query\" then\n\t\t\tCopy.Target.Conditions = {}\n\t\t\tfor _, Condition in Filter.Target.Conditions do\n\t\t\t\ttable.insert(Copy.Target.Conditions, table.clone(Condition))\n\t\t\tend\n\t\tend\n\n\t\tCopy.Enabled = Filter.Enabled ~= false\n\t\treturn Copy\n\tend\n\n\tlocal function EmitChanged()\n\t\tlocal Snapshot = CallFilters:GetAll()\n\t\tfor Listener in CallFilters.Listeners do\n\t\t\tif task then\n\t\t\t\ttask.spawn(Listener, Snapshot)\n\t\t\telse\n\t\t\t\tListener(Snapshot)\n\t\t\tend\n\t\tend\n\tend\n\n\tfunction CallFilters:GetAll()\n\t\tlocal Filters = {}\n\t\tfor _, Filter in self.Items do\n\t\t\ttable.insert(Filters, CopyFilter(Filter))\n\t\tend\n\t\treturn Filters\n\tend\n\n\tfunction CallFilters:Get(Id: string)\n\t\tlocal Filter = self.ById[Id]\n\t\treturn Filter and CopyFilter(Filter) or nil\n\tend\n\n\tfunction CallFilters:Add(Filter)\n\t\tlocal Copy = Validate(Filter, CallFilterSchema.Filter, \"Invalid call filter\")\n\t\tCopy.Id = Copy.Id or wax.shared.HttpService:GenerateGUID(false)\n\t\tassert(not self.ById[Copy.Id], `A call filter with id {Copy.Id} already exists`)\n\n\t\ttable.insert(self.Items, Copy)\n\t\tself.ById[Copy.Id] = Copy\n\t\tEmitChanged()\n\t\treturn CopyFilter(Copy)\n\tend\n\n\tfunction CallFilters:Update(Id: string, Changes)\n\t\tlocal Filter = self.ById[Id]\n\t\tif not Filter then\n\t\t\treturn nil\n\t\tend\n\n\t\tlocal ValidChanges = Validate(Changes, CallFilterSchema.Update, \"Invalid call filter update\")\n\t\tlocal Updated = CopyFilter(Filter)\n\t\tfor Key, Value in ValidChanges do\n\t\t\tUpdated[Key] = Value\n\t\tend\n\t\tUpdated = Validate(Updated, CallFilterSchema.Filter, \"Invalid updated call filter\")\n\n\t\tlocal Index = table.find(self.Items, Filter)\n\t\tif Index then\n\t\t\tself.Items[Index] = Updated\n\t\tend\n\t\tself.ById[Id] = Updated\n\n\t\tEmitChanged()\n\t\treturn CopyFilter(Updated)\n\tend\n\n\tfunction CallFilters:SetEnabled(Id: string, Enabled: boolean)\n\t\treturn self:Update(Id, { Enabled = Enabled })\n\tend\n\n\tfunction CallFilters:Remove(Id: string): boolean\n\t\tlocal Filter = self.ById[Id]\n\t\tif not Filter then\n\t\t\treturn false\n\t\tend\n\n\t\tself.ById[Id] = nil\n\t\tlocal Index = table.find(self.Items, Filter)\n\t\tif Index then\n\t\t\ttable.remove(self.Items, Index)\n\t\tend\n\t\tEmitChanged()\n\t\treturn true\n\tend\n\n\tfunction CallFilters:ReplaceAll(Filters, Silent: boolean?)\n\t\tlocal Validated = Validate(Filters or {}, Validation.Schema.array(CallFilterSchema.Filter), \"Invalid call filters\")\n\t\tlocal SeenIds = {}\n\t\tfor _, Filter in Validated do\n\t\t\tFilter.Id = Filter.Id or wax.shared.HttpService:GenerateGUID(false)\n\t\t\tassert(not SeenIds[Filter.Id], `A call filter with id {Filter.Id} already exists`)\n\t\t\tSeenIds[Filter.Id] = true\n\t\tend\n\n\t\ttable.clear(self.Items)\n\t\ttable.clear(self.ById)\n\t\tfor _, Filter in Validated do\n\t\t\ttable.insert(self.Items, Filter)\n\t\t\tself.ById[Filter.Id] = Filter\n\t\tend\n\n\t\tif not Silent then\n\t\t\tEmitChanged()\n\t\tend\n\tend\n\n\tfunction CallFilters:Subscribe(Listener)\n\t\tself.Listeners[Listener] = true\n\t\tListener(self:GetAll())\n\n\t\tlocal Subscription = {}\n\t\tfunction Subscription:Disconnect()\n\t\t\tCallFilters.Listeners[Listener] = nil\n\t\tend\n\t\treturn Subscription\n\tend\n\n\tfunction CallFilters:Match(Remote: Instance, Direction: string, Arguments)\n\t\tlocal WinningAction\n\t\tlocal WinningFilter\n\t\tlocal WinningPriority = 0\n\n\t\tfor _, Filter in self.Items do\n\t\t\tlocal TargetMatches = if Filter.Target.Type == \"Instance\"\n\t\t\t\tthen InstanceSerializer.IsEqualToInstance(Filter.Target.Remote, Remote)\n\t\t\t\telse RemoteFields.Matches(Filter.Target.Conditions, Remote)\n\t\t\tif\n\t\t\t\tFilter.Enabled\n\t\t\t\tand (Filter.Direction == \"Any\" or Filter.Direction == Direction)\n\t\t\t\tand TargetMatches\n\t\t\t\tand Operators.MatchesConditions(Filter.Conditions, Arguments)\n\t\t\tthen\n\t\t\t\tlocal Priority = ActionPriorities[Filter.Action] or 0\n\t\t\t\tif Priority > WinningPriority then\n\t\t\t\t\tWinningAction = Filter.Action\n\t\t\t\t\tWinningFilter = Filter\n\t\t\t\t\tWinningPriority = Priority\n\t\t\t\tend\n\t\t\tend\n\t\tend\n\n\t\treturn WinningAction, WinningFilter and CopyFilter(WinningFilter) or nil\n\tend\n\n\tfunction CallFilters:Resolve(Remote: Instance, Direction: string, Info)\n\t\tlocal Action, Filter = self:Match(Remote, Direction, Info.Arguments or {})\n\t\tif Action == \"Highlight\" then\n\t\t\tInfo.Highlighted = true\n\t\t\tInfo.CallFilterId = Filter.Id\n\t\telseif Action then\n\t\t\tInfo.CallFilterId = Filter.Id\n\t\tend\n\t\treturn Action, Filter\n\tend\n\n\twax.shared.CallFilters = CallFilters\nend\n--#endregion\n\n--#region @include region IsPlayerModule\nwax.shared.IsPlayerModule = function(Origin: LocalScript | ModuleScript, Instance: Instance): boolean\n\tif Instance and Instance.ClassName ~= \"BindableEvent\" then\n\t\treturn false\n\tend\n\n\tif not Origin or typeof(Origin) ~= \"Instance\" or not Origin.IsA(Origin, \"LuaSourceContainer\") then\n\t\treturn false\n\tend\n\n\tlocal PlayerModule = Origin and Origin.FindFirstAncestor(Origin, \"PlayerModule\") or nil\n\tif not PlayerModule then\n\t\treturn false\n\tend\n\n\tif PlayerModule.Parent == nil then\n\t\treturn true\n\tend\n\n\tif wax.shared.PlayerScripts then\n\t\treturn compareinstances(PlayerModule.Parent, wax.shared.PlayerScripts)\n\tend\n\n\treturn false\nend\nwax.shared.ShouldIgnore = function(Instance, Origin)\n\tif not wax.shared.Settings.LogRobloxInternalEvents.Value then\n\t\tif Instance.IsDescendantOf(Instance, wax.shared.RobloxReplicatedStorage) then\n\t\t\treturn true\n\t\tend\n\tend\n\n\treturn wax.shared.Settings.IgnoredRemotesDropdown.Value[Instance.ClassName] == true\n\t\tor (wax.shared.Settings.IgnorePlayerModule.Value and wax.shared.IsPlayerModule(Origin, Instance))\nend\n--#endregion\n\n--#region @include \"Src/Utils/Log.luau\" as \"wax.shared.Log\"\ndo\n\tlocal Log = {}\n\tLog.__index = Log\n\n\tlocal PendingCallDecisions = setmetatable({}, { __mode = \"k\" })\n\n\t--// Log Call Queue \\\\--\n\twax.shared.LogNotificationQueue = {\n\t\tItems = {},\n\t\tHead = 1,\n\t\tTail = 0,\n\t}\n\n\tlocal function QueueNotification(LogObject, CallIndex: number)\n\t\tlocal Queue = wax.shared.LogNotificationQueue\n\t\tQueue.Tail += 1\n\t\tQueue.Items[Queue.Tail] = {\n\t\t\tInstance = LogObject.Instance,\n\t\t\tType = LogObject.Type,\n\t\t\tLogIndex = LogObject.Index,\n\t\t\tCallIndex = CallIndex,\n\t\t}\n\tend\n\n\t--// Auto Ignore Constants \\\\--\n\tlocal SpamCallCountThreshold = 15\n\tlocal SpamTimeWindowSeconds = 1\n\tlocal AutoIgnoreSpammyEvents = false\n\n\tif not wax.shared.IS_ACTOR then\n\t\twax.shared.Connect(wax.shared.RunService.Heartbeat:Connect(function()\n\t\t\tlocal Queue = wax.shared.LogNotificationQueue\n\t\t\tlocal Tail = Queue.Tail\n\n\t\t\tif Queue.Head > Tail then\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal Batch = {}\n\t\t\tlocal BatchSize = 0\n\t\t\twhile Queue.Head <= Tail do\n\t\t\t\tlocal Notification = Queue.Items[Queue.Head]\n\t\t\t\tQueue.Items[Queue.Head] = nil\n\t\t\t\tQueue.Head += 1\n\n\t\t\t\tif Notification then\n\t\t\t\t\tBatchSize += 1\n\t\t\t\t\tBatch[BatchSize] = Notification\n\t\t\t\tend\n\t\t\tend\n\n\t\t\ttable.clear(Queue.Items)\n\t\t\tQueue.Head = 1\n\t\t\tQueue.Tail = 0\n\n\t\t\tif BatchSize > 0 then\n\t\t\t\tlocal Communicator = wax.shared.Communicator\n\t\t\t\tif Communicator then\n\t\t\t\t\tAutoIgnoreSpammyEvents = wax.shared.SaveManager:GetState(\"AutoIgnoreSpammyEvents\", false)\n\t\t\t\t\tCommunicator:Fire(Batch)\n\t\t\t\tend\n\n\t\t\t\ttable.clear(Batch)\n\t\t\tend\n\t\tend))\n\tend\n\n\t--// Actor Table Fixing \\\\--\n\tlocal FunctionToMetatadata, FixTable\n\tdo\n\t\tif wax.shared.IS_ACTOR then\n\t\t\tlocal FunctionMetadataCache = setmetatable({}, { __mode = \"k\" })\n\n\t\t\tlocal function CreateTraversalState(Refs)\n\t\t\t\treturn {\n\t\t\t\t\tCyclicRefs = Refs or {},\n\t\t\t\t\tTableIds = setmetatable({}, { __mode = \"k\" }),\n\t\t\t\t\tFunctions = setmetatable({}, { __mode = \"k\" }),\n\t\t\t\t\tNextId = 0,\n\t\t\t\t}\n\t\t\tend\n\n\t\t\tlocal function GenerateId(State)\n\t\t\t\tState.NextId += 1\n\t\t\t\treturn State.NextId\n\t\t\tend\n\n\t\t\tFixTable = function(Table, State)\n\t\t\t\tif not Table then\n\t\t\t\t\treturn nil\n\t\t\t\tend\n\n\t\t\t\tif not State or not State.CyclicRefs then\n\t\t\t\t\tState = CreateTraversalState(State)\n\t\t\t\tend\n\n\t\t\t\tlocal CyclicRefs = State.CyclicRefs\n\t\t\t\tlocal TableId = State.TableIds[Table]\n\t\t\t\tif not TableId then\n\t\t\t\t\tTableId = GenerateId(State)\n\t\t\t\t\tState.TableIds[Table] = TableId\n\t\t\t\tend\n\n\t\t\t\tlocal OutputTable = {}\n\t\t\t\tCyclicRefs[TableId] = OutputTable\n\n\t\t\t\tlocal ContainsCyclicRef = false\n\n\t\t\t\tfor Key, Value in next, Table do\n\t\t\t\t\tif type(Value) == \"table\" then\n\t\t\t\t\t\tlocal ExistingId = State.TableIds[Value]\n\t\t\t\t\t\tif ExistingId then\n\t\t\t\t\t\t\tContainsCyclicRef = true\n\n\t\t\t\t\t\t\tOutputTable[Key] = {\n\t\t\t\t\t\t\t\t__CyclicRef = true,\n\t\t\t\t\t\t\t\t__Id = ExistingId,\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tcontinue\n\t\t\t\t\t\tend\n\n\t\t\t\t\t\tif getmetatable(Value) then\n\t\t\t\t\t\t\tOutputTable[Key] =\n\t\t\t\t\t\t\t\t\"Cobalt: Impossible to bridge table with metatable from actor Environment to main Environment\"\n\t\t\t\t\t\t\tcontinue\n\t\t\t\t\t\tend\n\n\t\t\t\t\t\tlocal Result, _, ContainsCyclic = FixTable(Value, State)\n\t\t\t\t\t\tif not Result then\n\t\t\t\t\t\t\tcontinue\n\t\t\t\t\t\tend\n\n\t\t\t\t\t\tOutputTable[Key] = Result\n\t\t\t\t\t\tContainsCyclicRef = ContainsCyclicRef or ContainsCyclic\n\t\t\t\t\telseif type(Value) == \"function\" then\n\t\t\t\t\t\tOutputTable[Key] = FunctionToMetatadata(Value, State)\n\t\t\t\t\telse\n\t\t\t\t\t\tOutputTable[Key] = Value\n\t\t\t\t\tend\n\t\t\t\tend\n\n\t\t\t\treturn OutputTable, CyclicRefs, ContainsCyclicRef\n\t\t\tend\n\n\t\t\tFunctionToMetatadata = function(Function, State)\n\t\t\t\tif not Function then\n\t\t\t\t\treturn nil\n\t\t\t\tend\n\n\t\t\t\tif not State or not State.CyclicRefs then\n\t\t\t\t\tState = CreateTraversalState()\n\t\t\t\tend\n\n\t\t\t\tlocal CachedMetadata = FunctionMetadataCache[Function]\n\t\t\t\tif CachedMetadata then\n\t\t\t\t\treturn CachedMetadata\n\t\t\t\tend\n\n\t\t\t\tlocal Metadata = {\n\t\t\t\t\tAddress = tostring(Function),\n\t\t\t\t\tName = debug.info(Function, \"n\"),\n\t\t\t\t\tSource = debug.info(Function, \"s\"),\n\t\t\t\t\tIsC = iscclosure(Function),\n\t\t\t\t}\n\n\t\t\t\tif State.Functions[Function] then\n\t\t\t\t\tMetadata[\"Recursive\"] = true\n\t\t\t\t\tMetadata[\"Validation\"] = Data.Token\n\t\t\t\t\tMetadata[\"__Function\"] = true\n\n\t\t\t\t\treturn Metadata\n\t\t\t\tend\n\n\t\t\t\tState.Functions[Function] = true\n\n\t\t\t\tif not iscclosure(Function) then\n\t\t\t\t\tMetadata[\"Upvalues\"] = debug.getupvalues and #debug.getupvalues(Function) or 0\n\t\t\t\t\tMetadata[\"Constants\"] = debug.getconstants and #debug.getconstants(Function) or 0\n\t\t\t\t\tMetadata[\"Protos\"] = debug.getprotos and #debug.getprotos(Function) or 0\n\n\t\t\t\t\tif getfunctionhash then\n\t\t\t\t\t\tMetadata[\"FunctionHash\"] = getfunctionhash(Function)\n\t\t\t\t\tend\n\t\t\t\tend\n\n\t\t\t\t-- to validate that this function was generated by FunctionToMetatadata\n\t\t\t\tMetadata[\"Validation\"] = Data.Token\n\t\t\t\tMetadata[\"__Function\"] = true\n\n\t\t\t\tFunctionMetadataCache[Function] = Metadata\n\n\t\t\t\treturn Metadata\n\t\t\tend\n\t\tend\n\tend\n\n\t--// Cloning \\\\--\n\tfunction DeepClone(OriginalValue, ValueCopies)\n\t\tif wax.shared.IS_ACTOR then\n\t\t\treturn OriginalValue\n\t\tend\n\n\t\tlocal OriginalType = type(OriginalValue)\n\t\tif OriginalType ~= \"table\" then\n\t\t\tif OriginalType == \"string\" or OriginalType == \"number\" or OriginalType == \"boolean\" or OriginalValue == nil then\n\t\t\t\treturn OriginalValue\n\t\t\tend\n\n\t\t\tlocal RobloxType = typeof(OriginalValue)\n\t\t\tif RobloxType == \"Instance\" then\n\t\t\t\treturn cloneref(OriginalValue)\n\t\t\n\t\t\telseif RobloxType == \"userdata\" then\n\t\t\t\tif getmetatable(OriginalValue) then\n\t\t\t\t\treturn newproxy(true)\n\t\t\t\telse\n\t\t\t\t\treturn newproxy()\n\t\t\t\tend\n\n\t\t\telseif RobloxType == \"function\" then\n\t\t\t\tif clonefunction then\n\t\t\t\t\treturn clonefunction(OriginalValue)\n\t\t\t\telse\n\t\t\t\t\treturn OriginalValue\n\t\t\t\tend\n\t\t\tend\n\n\t\t\treturn OriginalValue\n\t\tend\n\n\t\t-- Cycle detection\n\t\tif ValueCopies then\n\t\t\tlocal CachedValue = ValueCopies[OriginalValue]\n\t\t\tif CachedValue then\n\t\t\t\treturn CachedValue\n\t\t\tend\n\t\telse\n\t\t\tValueCopies = {}\n\t\tend\n\n\t\t-- Shallow copy first, then selectively recurse\n\t\tlocal ShallowCopy = table.create(rawlen(OriginalValue))\n\t\tValueCopies[OriginalValue] = ShallowCopy\n\n\t\tfor Key, Value in next, OriginalValue do\n\t\t\tlocal ValueType = type(Value)\n\n\t\t\tif ValueType == \"table\" then\n\t\t\t\tShallowCopy[Key] = DeepClone(Value, ValueCopies)\n\n\t\t\telseif ValueType == \"userdata\" then\n\t\t\t\tlocal ValueRobloxType = typeof(Value)\n\n\t\t\t\tif ValueRobloxType == \"Instance\" then\n\t\t\t\t\tShallowCopy[Key] = cloneref(Value)\n\n\t\t\t\telseif ValueRobloxType == \"userdata\" then\n\t\t\t\t\tif getmetatable(Value) then\n\t\t\t\t\t\tShallowCopy[Key] = newproxy(true)\n\t\t\t\t\telse\n\t\t\t\t\t\tShallowCopy[Key] = newproxy()\n\t\t\t\t\tend\n\n\t\t\t\telse\n\t\t\t\t\tShallowCopy[Key] = Value\n\t\t\t\tend\n\n\t\t\telseif ValueType == \"function\" then\n\t\t\t\tif clonefunction then\n\t\t\t\t\tShallowCopy[Key] = clonefunction(Value)\n\t\t\t\telse\n\t\t\t\t\tShallowCopy[Key] = Value\n\t\t\t\tend\n\t\t\n\t\t\telse\n\t\t\t\tShallowCopy[Key] = Value\n\t\t\tend\n\t\tend\n\n\t\treturn ShallowCopy\n\tend\n\n\tif wax.shared.IS_ACTOR then\n\t\twax.shared.SerializeActorInfo = function(Info)\n\t\t\treturn FixTable(DeepClone(Info))\n\t\tend\n\tend\n\n\tfunction Log.new(Instance, Type, Index, CallingScript)\n\t\tlocal NewLog = setmetatable({\n\t\t\tInstance = Instance,\n\t\t\tType = Type,\n\t\t\tIndex = Index,\n\t\t\tCalls = {},\n\t\t\tGameCalls = {},\n\t\t\tSpamWindowStart = 0,\n\t\t\tSpamCallCount = 0,\n\t\t\tIgnored = false,\n\t\t\tBlocked = false,\n\t\t\tButton = nil,\n\t\t}, Log)\n\n\t\treturn NewLog\n\tend\n\n\tfunction Log:IsOverSpamThreshold()\n\t\tif not AutoIgnoreSpammyEvents then\n\t\t\treturn false\n\t\tend\n\n\t\tlocal Now = tick()\n\t\tif Now - self.SpamWindowStart > SpamTimeWindowSeconds then\n\t\t\tself.SpamWindowStart = Now\n\t\t\tself.SpamCallCount = 0\n\t\tend\n\n\t\tself.SpamCallCount = self.SpamCallCount + 1\n\n\t\tif self.SpamCallCount > SpamCallCountThreshold then\n\t\t\tif not self.Ignored then\n\t\t\t\tself.Ignore(self)\n\t\t\t\twax.shared.Sonner.info(`Ignored {self.Instance.Name} ({self.Type}) due to event spam.`)\n\t\t\tend\n\n\t\t\treturn true\n\t\tend\n\n\t\treturn false\n\tend\n\n\tlocal function RunInterceptors(Interceptors: { (...any) -> ...any }, Info: any, Log): boolean\n\t\tfor _, Callback in Interceptors do\n\t\t\tlocal Ok, Result = pcall(Callback, Info, Log.Instance, Log.Type)\n\t\t\tif not Ok then\n\t\t\t\twarn(`[Cobalt Plugin Interceptor] Error: {Result}`)\n\t\t\telseif Result == false then\n\t\t\t\treturn true\n\t\t\tend\n\t\tend\n\n\t\treturn false\n\tend\n\n\tfunction Log:ShouldBlock(RawInfo, PendingCallDecisionsKey): boolean\n\t\tPendingCallDecisionsKey = PendingCallDecisionsKey or tostring(RawInfo)\n\n\t\tlocal Decision = PendingCallDecisions[PendingCallDecisionsKey]\n\t\tif Decision then\n\t\t\treturn Decision.ShouldBlock\n\t\tend\n\n\t\tlocal FilterAction\n\t\tlocal CallFilters = wax.shared.CallFilters\n\t\tdo\n\t\t\tif CallFilters then\n\t\t\t\tFilterAction = CallFilters:Resolve(self.Instance, self.Type, RawInfo)\n\t\t\tend\n\t\tend\n\n\t\tlocal ShouldBlock = RawInfo.Blocked == true or self.Blocked or FilterAction == \"Block\"\n\t\tif ShouldBlock then\n\t\t\tRawInfo.Blocked = true\n\t\tend\n\n\t\tPendingCallDecisions[PendingCallDecisionsKey] = {\n\t\t\tFilterAction = FilterAction,\n\t\t\tShouldBlock = ShouldBlock,\n\t\t}\n\t\treturn ShouldBlock\n\tend\n\n\tfunction Log:Call(RawInfo): number?\n\t\tlocal PendingCallDecisionsKey = tostring(RawInfo)\n\n\t\tlocal ShouldBlock = self:ShouldBlock(RawInfo, PendingCallDecisionsKey)\n\t\tlocal Decision = PendingCallDecisions[PendingCallDecisionsKey]\n\t\tPendingCallDecisions[PendingCallDecisionsKey] = nil\n\n\t\tlocal ShouldCapture = not self.Ignored and Decision.FilterAction ~= \"Ignore\"\n\t\tdo\n\t\t\tif ShouldBlock then\n\t\t\t\tShouldCapture = ShouldCapture and wax.shared.SaveManager:GetState(\"LogBlockedRemotes\", false)\n\t\t\tend\n\n\t\t\tif RawInfo.Omit then\n\t\t\t\tShouldCapture = false\n\t\t\tend\n\t\tend\n\n\t\tif not ShouldCapture then\n\t\t\treturn nil\n\t\tend\n\n\t\t--// Ratelimiting \\\\--\n\t\tif not wax.shared.IS_ACTOR then\n\t\t\tlocal Success, SpamData = pcall(function() return self.IsOverSpamThreshold(self) end)\n\t\t\tif Success and SpamData then\n\t\t\t\treturn nil\n\t\t\tend\n\t\tend\n\n\t\t--// Info stuff \\\\--\n\t\tlocal Info = DeepClone(RawInfo)\n\t\tInfo.CreationTime = tick()\n\n\t\t--// Actor Relaying \\\\--\n\t\tif wax.shared.IS_ACTOR then\n\t\t\tif self.Instance == wax.shared.Communicator then\n\t\t\t\treturn nil\n\t\t\tend\n\n\t\t\tInfo[\"Actor\"] = CurrentActor\n\n\t\t\t--// Fix Arguments \\\\--\n\t\t\tlocal OldArguments = Info.Arguments\n\t\t\tInfo.Arguments = {\n\t\t\t\tData = OldArguments,\n\t\t\t\tn = OldArguments.n,\n\t\t\t}\n\n\t\t\tif Info.InvokeResult then\n\t\t\t\tlocal OldInvokeResult = Info.InvokeResult\n\t\t\t\tInfo.InvokeResult = {\n\t\t\t\t\tData = OldInvokeResult,\n\t\t\t\t\tn = OldInvokeResult.n,\n\t\t\t\t}\n\t\t\tend\n\n\t\t\tlocal FixedInfo, CyclicRefs, ContainsCyclicRef = FixTable(Info)\n\n\t\t\t-- Seliware puts their actor BindableEvents in CoreGui\n\t\t\tlocal identity = getthreadidentity()\n\t\t\tsetthreadidentity(8)\n\t\t\twax.shared.Communicator.Fire(\n\t\t\t\twax.shared.Communicator,\n\t\t\t\t\"ActorCall\",\n\t\t\t\tself.Instance,\n\t\t\t\tself.Type,\n\t\t\t\tFixedInfo,\n\t\t\t\tCyclicRefs,\n\t\t\t\tContainsCyclicRef\n\t\t\t)\n\t\t\tsetthreadidentity(identity)\n\t\t\treturn nil\n\t\tend\n\n\t\t--// Plugin Interceptors \\\\--\n\t\tlocal PluginManager = wax.shared.CobaltPluginManager\n\t\tif PluginManager and PluginManager.HasInterceptors then\n\t\t\t-- Run Instance-specific interceptors (both exact type and \"All\")\n\t\t\tlocal InstanceIntercept = PluginManager.Registry.Interceptors.Instance[self.Instance]\n\t\t\tif InstanceIntercept then\n\t\t\t\tif InstanceIntercept[self.Type] and RunInterceptors(InstanceIntercept[self.Type], Info, self) then\n\t\t\t\t\treturn nil\n\t\t\t\tend\n\t\t\t\tif InstanceIntercept[\"All\"] and RunInterceptors(InstanceIntercept[\"All\"], Info, self) then\n\t\t\t\t\treturn nil\n\t\t\t\tend\n\t\t\tend\n\n\t\t\t-- Run Global interceptors (both exact type and \"All\")\n\t\t\tlocal GlobalByType = PluginManager.Registry.Interceptors.Global[self.Type]\n\t\t\tif GlobalByType and RunInterceptors(GlobalByType, Info, self) then\n\t\t\t\treturn nil\n\t\t\tend\n\n\t\t\tlocal GlobalAll = PluginManager.Registry.Interceptors.Global[\"All\"]\n\t\t\tif GlobalAll and RunInterceptors(GlobalAll, Info, self) then\n\t\t\t\treturn nil\n\t\t\tend\n\t\tend\n\n\t\t--// Update Log \\\\--\n\t\tlocal Index = #self.Calls + 1\n\t\tself.Calls[Index] = Info\n\t\tif not Info.IsExecutor then\n\t\t\ttable.insert(self.GameCalls, Index)\n\t\tend\n\n\t\tQueueNotification(self, Index)\n\t\treturn Index\n\tend\n\n\tfunction Log:ClearCalls()\n\t\ttable.clear(self.Calls)\n\t\ttable.clear(self.GameCalls)\n\tend\n\n\tfunction Log:Ignore()\n\t\tself.Ignored = not self.Ignored\n\n\t\tif not wax.shared.IS_ACTOR then\n\t\t\tif wax.shared.ActorCommunicator then\n\t\t\t\tpcall(wax.shared.ActorCommunicator.Fire, wax.shared.ActorCommunicator, \"MainIgnore\", self.Instance, self.Type)\n\t\t\tend\n\n\t\t\tlocal IgnoredRemoteList = wax.shared.Settings[\"IgnoredRemotes\"]\n\t\t\tif IgnoredRemoteList then\n\t\t\t\tif self.Ignored then\n\t\t\t\t\tIgnoredRemoteList:AddToList(self)\n\t\t\t\telse\n\t\t\t\t\tIgnoredRemoteList:RemoveFromList(self)\n\t\t\t\tend\n\t\t\tend\n\t\tend\n\tend\n\n\tlocal ClassesConnectionsToggle = {\n\t\tRemoteEvent = \"OnClientEvent\",\n\t\tUnreliableRemoteEvent = \"OnClientEvent\",\n\t\tBindableEvent = \"Event\",\n\t}\n\n\tfunction Log:SetConnectionsEnabled(enabled: boolean)\n\t\tif not self.Instance or not ClassesConnectionsToggle[self.Instance.ClassName] then\n\t\t\treturn\n\t\tend\n\n\t\tlocal ConnectionName = ClassesConnectionsToggle[self.Instance.ClassName]\n\t\tif self.Type ~= \"Incoming\" or not ConnectionName then\n\t\t\treturn\n\t\tend\n\n\t\tlocal LoggingFunctions = wax.shared.IncomingLogConnectionFunctions\n\t\tfor _, Connection in pairs(getconnections(self.Instance[ConnectionName])) do\n\t\t\tif LoggingFunctions and LoggingFunctions[Connection.Function] then\n\t\t\t\tcontinue\n\t\t\tend\n\n\t\t\tif enabled then\n\t\t\t\tConnection:Enable()\n\t\t\telse\n\t\t\t\tConnection:Disable()\n\t\t\tend\n\t\tend\n\tend\n\n\tfunction Log:Block()\n\t\tif not wax.shared.IS_ACTOR and wax.shared.ActorCommunicator then\n\t\t\tpcall(wax.shared.ActorCommunicator.Fire, wax.shared.ActorCommunicator, \"MainBlock\", self.Instance, self.Type)\n\t\tend\n\n\t\tself.Blocked = not self.Blocked\n\t\tself:SetConnectionsEnabled(not self.Blocked)\n\tend\n\n\tfunction Log:SetButton(Instance, Name, Calls)\n\t\tself.Button = {\n\t\t\tInstance = Instance,\n\t\t\tName = Name,\n\t\t\tCalls = Calls,\n\t\t}\n\tend\n\n\twax.shared.Log = Log\nend\n--#endregion\n\n--#region @include \"Src/Spy/Hooks/Luau/Interceptors/Incoming.luau\" as \"wax.shared.IncomingInterceptor\"\ndo\n\t--// Variables \\\\--\n\tlocal setfenv = setfenv\n\tlocal getconnections = wax.shared.ExecutorSupport[\"getconnections\"].IsWorking and getconnections or function() return {} end\n\n\tlocal ClassesToHook = {\n\t\tRemoteEvent = \"OnClientEvent\",\n\t\tRemoteFunction = \"OnClientInvoke\",\n\t\tUnreliableRemoteEvent = \"OnClientEvent\",\n\t\tBindableEvent = \"Event\",\n\t\tBindableFunction = \"OnInvoke\",\n\t}\n\n\tlocal ConnectionKeys = CreateLookupTable({\n\t\t\"Connect\",\n\t\t\"ConnectParallel\",\n\t\t\"connect\",\n\t\t\"connectParallel\",\n\t\t\"Once\",\n\t})\n\n\t--// State \\\\--\n\tlocal ConnectionsEnabled = false\n\tlocal CallbacksEnabled = false\n\tlocal ConnectionHookEnabled = false\n\n\t--// Signals & Detours \\\\--\n\tlocal LogConnectionFunctions = {}\n\tlocal CallbackOwners = setmetatable({}, { __mode = \"k\" })\n\tlocal SignalMapping = setmetatable({}, { __mode = \"kv\" })\n\tlocal ObservedConnectionInstances = setmetatable({}, { __mode = \"k\" })\n\twax.shared.IncomingLogConnectionFunctions = LogConnectionFunctions\n\n\tlocal CobaltObserverEnvironmentKey = \"__CobaltIncomingObserver\"\n\n\t--// Types \\\\--\n\ttype InstancesToHook = RemoteEvent | UnreliableRemoteEvent | RemoteFunction | BindableEvent | BindableFunction\n\ttype MethodsToHook = \"OnClientEvent\" | \"OnClientInvoke\" | \"Event\" | \"OnInvoke\"\n\texport type Options = {\n\t\tConnections: boolean?,\n\t\tCallbacks: boolean?,\n\t\tHookConnections: boolean?,\n\t}\n\n\t--// Functions \\\\--\n\tlocal function GetLog(Instance: InstancesToHook, Function: (...any) -> ...any)\n\t\tlocal DebugId = wax.shared.GetDebugId(Instance)\n\n\t\tif wax.shared.ShouldIgnore(Instance, getcallingscript()) or LogConnectionFunctions[Function] then\n\t\t\treturn nil\n\t\tend\n\n\t\tlocal IncomingLogs = wax.shared.Logs.Incoming\n\t\tif not IncomingLogs then\n\t\t\treturn nil\n\t\tend\n\n\t\tlocal Log = IncomingLogs[DebugId]\n\t\tif not Log then\n\t\t\tLog = wax.shared.NewLog(Instance, \"Incoming\", getcallingscript(), DebugId)\n\t\tend\n\n\t\treturn Log\n\tend\n\n\tlocal function ResolveCallableFunction(Value: any): ((...any) -> ...any)?\n\t\tif typeof(Value) == \"function\" then\n\t\t\treturn Value\n\t\tend\n\n\t\tlocal Success, Metatable = pcall(wax.shared.getrawmetatable, Value)\n\t\tif not Success or not Metatable then\n\t\t\treturn nil\n\t\tend\n\n\t\tlocal HasCall, Call = pcall(rawget, Metatable, \"__call\")\n\t\treturn if HasCall and typeof(Call) == \"function\" then Call else nil\n\tend\n\n\t--[[\n\t\tIndividually logs an incoming remote call.\n\n\t\t@param Instance The instance that was called.\n\t\t@param Function The function that was called, if applicable.\n\t\t@param Info The information about the call, including arguments and origin. Can be nil.\n\t\t@param ... The arguments passed from the server to the client.\n\t\t@return boolean, Log? Returns true if the call was blocked, plus the log when one was used.\n\t]]\n\tlocal function LogRemote(\n\t\tInstance: InstancesToHook,\n\t\tFunction: (...any) -> ...any,\n\t\tInfo: {\n\t\t\tArguments: { [number]: any, n: number },\n\t\t\tOrigin: Instance,\n\t\t\tFunction: (...any) -> ...any,\n\t\t\tLine: number,\n\t\t\tIsExecutor: boolean,\n\t\t\tBlocked: boolean?,\n\t\t}\n\t)\n\t\tlocal Log = GetLog(Instance, Function)\n\t\tif not Log then\n\t\t\treturn false, nil\n\t\tend\n\n\t\tlocal ShouldBlock = Log:ShouldBlock(Info)\n\t\tlocal CallIndex = Log:Call(Info)\n\t\treturn ShouldBlock, Log, CallIndex\n\tend\n\n\t--#region Hook Filters\n\tlocal SupportsFilters = wax.shared.ExecutorSupport[\"FilterBase\"].IsWorking\n\n\t--[[\n\t\tCreates a base filter for the incoming hooks.\n\n\t\t@return `table` The base filter.\n\t]]\n\tlocal function CreateBaseFilter()\n\t\tlocal Filters = {}\n\t\tif not SupportsFilters then\n\t\t\treturn Filters\n\t\tend\n\n\t\t--// allowed classnames \\\\--\n\t\tfor ClassName in ClassesToHook do\n\t\t\ttable.insert(Filters, InstanceTypeFilter.new(1, ClassName))\n\t\tend\n\n\t\treturn Filters\n\tend\n\t--#endregion\n\n\t--#region Incoming Connection Stuff\n\tlocal function IsCobaltConnectionFunction(Function): boolean\n\t\tif not Function then\n\t\t\treturn false\n\t\tend\n\n\t\tif LogConnectionFunctions[Function] then\n\t\t\treturn true\n\t\tend\n\n\t\tlocal Success, Environment = pcall(getfenv, Function)\n\t\tlocal VerificationToken = wax.shared.CobaltVerificationToken\n\t\treturn (\n\t\t\tSuccess\n\t\t\tand VerificationToken ~= nil\n\t\t\tand typeof(Environment) == \"table\"\n\t\t\tand rawequal(rawget(Environment, CobaltObserverEnvironmentKey), VerificationToken)\n\t\t)\n\tend\n\n\t--[[\n\t\tCreates a function that can be used to pass to `Connect` which will log all the incoming calls. It will additonally add the function to a ignore list (`LogConnectionFunctions`) to prevent unneccessary logging.\n\t\t\n\t\t@param Instance The instance to log.\n\t\t@param Method The method to log (e.g., \"OnClientEvent\").\n\t\t@return function Returns a function that logs all calls to the given instance and method.\n\t]]\n\tlocal function CreateConnectionFunction(Instance: InstancesToHook, Method: MethodsToHook)\n\t\tlocal CachedConnectionInfo = nil\n\t\tlocal CachedConnectionCount = -1\n\n\t\tlocal DebugId = wax.shared.GetDebugId(Instance)\n\n\t\tlocal ConnectionFunction = function(...)\n\t\t\t--// Skip if this remote is already ignored \\\\--\n\t\t\tlocal ExistingLog = wax.shared.Logs.Incoming[DebugId]\n\t\t\tif ExistingLog and ExistingLog.Ignored then\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal Signal = (Instance :: any)[Method]\n\t\t\tlocal Connections = getconnections(Signal)\n\t\t\tlocal ConnectionCount = #Connections\n\n\t\t\t-- Only re-analyze connections when the count changes (connect/disconnect)\n\t\t\tif ConnectionCount ~= CachedConnectionCount then\n\t\t\t\tCachedConnectionCount = ConnectionCount\n\n\t\t\t\tlocal Information = {\n\t\t\t\t\tHasValidConnections = false,\n\t\t\t\t\tHasForeignLuaConnections = false,\n\t\t\t\t\tEntries = {},\n\t\t\t\t}\n\n\t\t\t\tfor _, Connection in Connections do\n\t\t\t\t\t--// Foreign State Connections \\\\--\n\t\t\t\t\tif Connection.ForeignState then\n\t\t\t\t\t\t--// It is a Lua Connection - Other Actor's Connections \\\\--\n\t\t\t\t\t\tif Connection.LuaConnection then\n\t\t\t\t\t\t\tInformation.HasForeignLuaConnections = true\n\t\t\t\t\t\tend\n\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tend\n\n\t\t\t\t\t--// Get Function \\\\--\n\t\t\t\t\tlocal Function = typeof(Connection.Function) == \"function\" and (Connection.Function) or (nil)\n\t\t\t\t\tif IsCobaltConnectionFunction(Function) then\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tend\n\n\t\t\t\t\tInformation.HasValidConnections = true\n\n\t\t\t\t\t--// Get Origin \\\\--\n\t\t\t\t\tlocal Thread = Connection.Thread\n\t\t\t\t\tlocal Origin = nil\n\n\t\t\t\t\tif Thread and getscriptfromthread then\n\t\t\t\t\t\tOrigin = getscriptfromthread(Thread)\n\t\t\t\t\tend\n\n\t\t\t\t\tif not Origin and Function then\n\t\t\t\t\t\t-- ts is unreliable because people could js set the script global to nil\n\t\t\t\t\t\t-- if only debug.getinfo(Function).source or debug.info(Function, \"s\") returned an Instance...\n\n\t\t\t\t\t\tlocal Script = rawget(getfenv(Function), \"script\")\n\t\t\t\t\t\tif typeof(Script) == \"Instance\" then\n\t\t\t\t\t\t\tOrigin = Script\n\t\t\t\t\t\tend\n\t\t\t\t\tend\n\n\t\t\t\t\ttable.insert(Information.Entries, {\n\t\t\t\t\t\tFunction = Function,\n\t\t\t\t\t\tOrigin = Origin,\n\t\t\t\t\t\tIsExecutor = Function and isexecutorclosure(Function) or false,\n\t\t\t\t\t})\n\t\t\t\tend\n\n\t\t\t\tCachedConnectionInfo = Information\n\t\t\tend\n\n\t\t\tlocal Arguments = wax.shared.SafePack.Pack(...)\n\t\t\tlocal TargetLog, TargetCallIndex\n\n\t\t\t--// Log Remote \\\\--\n\t\t\tif CachedConnectionInfo.HasValidConnections then\n\t\t\t\tfor _, Entry in CachedConnectionInfo.Entries do\n\t\t\t\t\tTargetLog, TargetCallIndex = select(2, LogRemote(Instance, Entry.Function, {\n\t\t\t\t\t\tArguments = Arguments,\n\t\t\t\t\t\tOrigin = Entry.Origin,\n\t\t\t\t\t\tFunction = Entry.Function,\n\t\t\t\t\t\tLine = nil,\n\t\t\t\t\t\tIsExecutor = Entry.IsExecutor,\n\t\t\t\t\t}))\n\t\t\t\tend\n\n\t\t\telseif not wax.shared.IS_ACTOR then\n\t\t\t\tTargetLog, TargetCallIndex = select(2, LogRemote(Instance, nil, {\n\t\t\t\t\tArguments = Arguments,\n\t\t\t\t\tOrigin = nil,\n\t\t\t\t\tFunction = nil,\n\t\t\t\t\tLine = nil,\n\t\t\t\t\tIsExecutor = false,\n\t\t\t\t}))\n\t\t\tend\n\n\t\t\tlocal Communicator = wax.shared.ActorCommunicator\n\t\t\tif Communicator then\n\t\t\t\tif\n\t\t\t\t\tnot wax.shared.IS_ACTOR\n\t\t\t\t\tand CachedConnectionInfo.HasForeignLuaConnections\n\t\t\t\t\tand TargetLog\n\t\t\t\t\tand TargetCallIndex\n\t\t\t\tthen\n\t\t\t\t\tCommunicator:Fire(\n\t\t\t\t\t\t\"InspectIncomingConnections\",\n\t\t\t\t\t\tInstance,\n\t\t\t\t\t\tMethod,\n\t\t\t\t\t\tTargetLog.Index,\n\t\t\t\t\t\tTargetCallIndex\n\t\t\t\t\t)\n\t\t\t\tend\n\t\t\tend\n\t\tend\n\n\t\tlocal OriginalEnvironment = getfenv(ConnectionFunction)\n\t\tsetfenv(ConnectionFunction, setmetatable({\n\t\t\t[CobaltObserverEnvironmentKey] = wax.shared.CobaltVerificationToken,\n\t\t}, {\n\t\t\t__index = OriginalEnvironment,\n\t\t\t__newindex = OriginalEnvironment,\n\t\t}))\n\n\t\tLogConnectionFunctions[ConnectionFunction] = true\n\t\treturn ConnectionFunction\n\tend\n\t--#endregion\n\n\t--#region Incoming Callback Stuff\n\t--[[\n\t\tHandles logging for a callback.\n\n\t\t@param Log The log to use.\n\t\t@param Info The pending callback call information.\n\t\t@param InitialEnv The initial environment to use.\n\t\t@param InitialIdentity The initial identity to use.\n\t\t@param ... The result of the callback.\n\n\t\t@return The result of the callback.\n\t]]\n\tlocal function HandleCallbackLogging(Log, Info, InitialEnv, InitialIdentity, ...)\n\t\tsetfenv(0, InitialEnv)\n\t\tsetthreadidentity(InitialIdentity)\n\n\t\tif Log then\n\t\t\tInfo.InvokeResult = wax.shared.SafePack.Pack(...)\n\t\t\tLog:Call(Info)\n\t\tend\n\n\t\treturn ...\n\tend\n\n\t--[[\n\t\tCreates a function that can be used to pass to callbacks (.OnInvoke & .OnClientInvoke) which will log all the incoming calls.\n\t\t\n\t\t@param Instance The instance to log.\n\t\t@param Function The original callback of the RemoteFunction\n\t\t@return function Returns a function that logs all function calls to the given instance.\n\t]]\n\tlocal function CreateCallbackDetour(Instance: InstancesToHook, Callback: any)\n\t\tlocal CallbackFunction = assert(ResolveCallableFunction(Callback), \"Callback is not callable\")\n\t\tlocal Detour = function(...)\n\t\t\tlocal Origin = nil\n\n\t\t\t-- May not exist in all executors\n\t\t\tif getscriptfromthread then\n\t\t\t\tOrigin = getscriptfromthread(coroutine.running())\n\t\t\tend\n\n\t\t\t-- Unreliable method to get script.\n\t\t\tif not Origin then\n\t\t\t\tlocal Script = rawget(getfenv(CallbackFunction), \"script\")\n\t\t\t\tif typeof(Script) == \"Instance\" then\n\t\t\t\t\tOrigin = Script\n\t\t\t\tend\n\t\t\tend\n\n\t\t\tlocal FunctionCaller = debug.info(2, \"f\")\n\t\t\tlocal IsExecutor = if typeof(FunctionCaller) == \"function\"\n\t\t\t\tthen isexecutorclosure(FunctionCaller)\n\t\t\t\telse isexecutorclosure(CallbackFunction)\n\n\t\t\tlocal Arguments = wax.shared.SafePack.Pack(...)\n\t\t\tlocal Log = GetLog(Instance, CallbackFunction)\n\t\t\tlocal Info = {\n\t\t\t\tArguments = Arguments,\n\t\t\t\tOrigin = Origin,\n\t\t\t\tFunction = CallbackFunction,\n\t\t\t\tLine = nil,\n\t\t\t\tIsExecutor = IsExecutor,\n\t\t\t\tInvokeKind = \"Callback\",\n\t\t\t}\n\t\t\tif Log and Log:ShouldBlock(Info) then\n\t\t\t\tLog:Call(Info)\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal InitialEnv, InitialIdentity = getfenv(CreateCallbackDetour), getthreadidentity()\n\t\t\tlocal IsDirectFunction = rawequal(Callback, CallbackFunction)\n\n\t\t\tsetthreadidentity(2)\n\t\t\tsetfenv(0, getfenv(CallbackFunction))\n\t\t\tif IsDirectFunction then\n\t\t\t\treturn HandleCallbackLogging(\n\t\t\t\t\tLog,\n\t\t\t\t\tInfo,\n\t\t\t\t\tInitialEnv,\n\t\t\t\t\tInitialIdentity,\n\t\t\t\t\tCallbackFunction(...)\n\t\t\t\t)\n\t\t\tend\n\n\t\t\treturn HandleCallbackLogging(\n\t\t\t\tLog,\n\t\t\t\tInfo,\n\t\t\t\tInitialEnv,\n\t\t\t\tInitialIdentity,\n\t\t\t\tCallbackFunction(Callback, ...)\n\t\t\t)\n\t\tend\n\n\t\tif wax.shared.ExecutorSupport[\"setstackhidden\"].IsWorking then\n\t\t\tsetstackhidden(Detour, true)\n\t\tend\n\n\t\tCallbackOwners[Detour] = {\n\t\t\tOriginal = Callback,\n\t\t\tMethod = ClassesToHook[Instance.ClassName],\n\t\t\tInstance = Instance\n\t\t}\n\t\treturn Detour\n\tend\n\n\tlocal function GetOriginalScript(OriginalEnv: { [string]: any}): Instance?\n\t\tlocal OriginalScript = rawget(OriginalEnv, \"script\")\n\t\tif typeof(OriginalScript) ~= \"Instance\" then\n\t\t\treturn nil\n\t\tend\n\n\t\treturn OriginalScript\n\tend\n\n\t--[[\n\t\tRestores the callback detours for the given instances. Used for cobalt unloading.\n\t\tNOTE: Keep this in here so Actors can rely on wax.shared.RestoreCallbackDetours\n\t]]\n\twax.shared.RestoreCallbackDetours = function()\n\t\tfor Detour, Owner in CallbackOwners do\n\t\t\tlocal Success, CurrentCallback = pcall(getcallbackvalue, Owner.Instance, Owner.Method)\n\t\t\tif not (Success and rawequal(CurrentCallback, Detour)) then\n\t\t\t\tcontinue\n\t\t\tend\n\n\t\t\tpcall(function()\n\t\t\t\tif wax.shared.trampoline_call then\n\t\t\t\t\tlocal OriginalEnv = getfenv(Owner.Original)\n\t\t\t\t\tlocal OriginalScript = GetOriginalScript(OriginalEnv)\n\n\t\t\t\t\twax.shared.trampoline_call(function()\n\t\t\t\t\t\tOwner.Instance[Owner.Method] = Owner.Original\n\t\t\t\t\tend, {}, {\n\t\t\t\t\t\tenv = OriginalEnv,\n\t\t\t\t\t\tscript = OriginalScript,\n\t\t\t\t\t\tidentity = 2\n\t\t\t\t\t})\n\t\t\t\telse\n\t\t\t\t\ttask.spawn(function()\n\t\t\t\t\t\tlocal OriginalEnv = getfenv(Owner.Original)\n\n\t\t\t\t\t\tsetthreadidentity(2)\n\t\t\t\t\t\tsetfenv(0, OriginalEnv)\n\t\t\t\t\t\tOwner.Instance[Owner.Method] = Owner.Original\n\t\t\t\t\tend)\n\t\t\t\tend\n\t\t\tend)\n\t\tend\n\n\t\ttable.clear(CallbackOwners)\n\tend\n\n\t--#endregion\n\n\t--[[\n\t\tHandles setting up logging for the appropriate instances.\n\n\t\t@param Instance The instance to handle.\n\t]]\n\tlocal function HandleInstance(Instance: any)\n\t\tif\n\t\t\tnot ClassesToHook[Instance.ClassName]\n\t\t\tor Instance == wax.shared.Communicator\n\t\t\tor Instance == wax.shared.ActorCommunicator\n\t\tthen\n\t\t\treturn\n\t\tend\n\n\t\tlocal Method = ClassesToHook[Instance.ClassName]\n\n\t\tif ConnectionsEnabled and not ObservedConnectionInstances[Instance] then\n\t\t\tif Instance.ClassName == \"RemoteEvent\" or Instance.ClassName == \"UnreliableRemoteEvent\" then\n\t\t\t\twax.shared.Connect(Instance.OnClientEvent:Connect(CreateConnectionFunction(Instance, Method)))\n\n\t\t\t\tSignalMapping[Instance.OnClientEvent] = Instance\n\t\t\t\tObservedConnectionInstances[Instance] = true\n\t\t\telseif Instance.ClassName == \"BindableEvent\" then\n\t\t\t\twax.shared.Connect(Instance.Event:Connect(CreateConnectionFunction(Instance, Method)))\n\n\t\t\t\tSignalMapping[Instance.Event] = Instance\n\t\t\t\tObservedConnectionInstances[Instance] = true\n\t\t\tend\n\t\tend\n\n\t\tif CallbacksEnabled then\n\t\t\tif Instance.ClassName == \"RemoteFunction\" or Instance.ClassName == \"BindableFunction\" then\n\t\t\t\tlocal IsCoreRemote = Instance:IsDescendantOf(wax.shared.RobloxReplicatedStorage)\n\t\t\t\tif IsCoreRemote then return end\n\n\t\t\t\tlocal Success, Callback = pcall(getcallbackvalue, Instance, Method)\n\t\t\t\tlocal IsCallable = ResolveCallableFunction(Callback) ~= nil\n\n\t\t\t\tif not Success or not IsCallable or CallbackOwners[Callback] then\n\t\t\t\t\treturn\n\t\t\t\tend\n\n\t\t\t\t--// Use trampoline_call so error redirection dosent occur \\\\--\n\t\t\t\tif wax.shared.trampoline_call then\n\t\t\t\t\tlocal OriginalEnv = getfenv(Callback)\n\t\t\t\t\tlocal OriginalScript = GetOriginalScript(OriginalEnv)\n\n\t\t\t\t\twax.shared.trampoline_call(function()\n\t\t\t\t\t\tInstance[Method] = CreateCallbackDetour(Instance, Callback)\n\t\t\t\t\tend, {}, {\n\t\t\t\t\t\tenv = OriginalEnv,\n\t\t\t\t\t\tscript = OriginalScript,\n\t\t\t\t\t\tidentity = 2\n\t\t\t\t\t})\n\t\t\t\telse\n\t\t\t\t\tInstance[Method] = CreateCallbackDetour(Instance, Callback)\n\t\t\t\tend\n\t\t\tend\n\t\tend\n\tend\n\n\t--[[\n\t\tCreates a hook that intercepts .OnInvoke & .OnClientInvoke assignments and detours them to log the calls.\n\t]]\n\tlocal function SetupCallbackAssignmentHook()\n\t\tlocal NewIndexHookFilter = SupportsFilters and AnyFilter.new(CreateBaseFilter())\n\t\t\n\t\twax.shared.NewIndexHook = wax.shared.Hooking.HookMetaMethod(game, \"__newindex\", function(...)\n\t\t\tlocal self, key, value = ...\n\n\t\t\tif typeof(self) ~= \"Instance\" or not ClassesToHook[self.ClassName] then\n\t\t\t\treturn wax.shared.NewIndexHook(...)\n\t\t\tend\n\n\t\t\tif self.ClassName == \"RemoteFunction\" or self.ClassName == \"BindableFunction\" then\n\t\t\t\tlocal Method = ClassesToHook[self.ClassName]\n\n\t\t\t\tlocal IsCallable = ResolveCallableFunction(value) ~= nil\n\n\t\t\t\tif key == Method and IsCallable then\n\t\t\t\t\tif CallbackOwners[value] then\n\t\t\t\t\t\treturn wax.shared.NewIndexHook(...)\n\t\t\t\t\tend\n\n\t\t\t\t\treturn wax.shared.NewIndexHook(self, key, CreateCallbackDetour(self :: InstancesToHook, value))\n\t\t\t\tend\n\t\t\tend\n\n\t\t\treturn wax.shared.NewIndexHook(...)\n\t\tend, NewIndexHookFilter)\n\tend\n\n\t--[[\n\t\tHandles logging for a connection.\n\n\t\t@param Method The method to log.\n\t\t@param callback The callback to log.\n\t\t@param ... The arguments to log.\n\n\t\t@return The result of the connection.\n\t]]\n\tlocal function HandleConnectionLogging(Instance, Method, callback, ...)\n\t\tlocal Log = wax.shared.Logs.Incoming[wax.shared.GetDebugId(Instance)]\n\n\t\tif Log and Log.Blocked then\n\t\t\tfor _, Connection in getconnections(Instance[Method]) do\n\t\t\t\tif not Connection.ForeignState and Connection.Function ~= callback then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\n\t\t\t\tConnection:Disable()\n\t\t\tend\n\t\tend\n\n\t\treturn ...\n\tend\n\n\t--[[\n\t\tCreates a hook that disables connections for blocked instances on creation.\n\t]]\n\tlocal function SetupConnectionAssignmentHook()\n\t\tlocal SignalMetatable = wax.shared.getrawmetatable(Instance.new(\"Part\").Touched)\n\t\twax.shared.Hooks[SignalMetatable.__index] = wax.shared.Hooking.HookFunction(SignalMetatable.__index, function(...)\n\t\t\tlocal self, key = ...\n\n\t\t\tif not wax.shared.Unloaded and ConnectionKeys[key] then\n\t\t\t\tlocal Instance = SignalMapping[self]\n\t\t\t\tlocal Connect = wax.shared.Hooks[SignalMetatable.__index](...)\n\n\t\t\t\tif not Instance then\n\t\t\t\t\treturn Connect\n\t\t\t\tend\n\n\t\t\t\tlocal Method = ClassesToHook[Instance.ClassName]\n\t\t\t\treturn wax.shared.newcclosure(function(...)\n\t\t\t\t\tlocal _self, callback = ...\n\t\t\t\t\treturn HandleConnectionLogging(Instance, Method, callback, Connect(...))\n\t\t\t\tend, debug.info(Connect, \"n\"))\n\t\t\tend\n\n\t\t\treturn wax.shared.Hooks[SignalMetatable.__index](...)\n\t\tend)\n\tend\n\n\tlocal Started = false\n\twax.shared.IncomingInterceptor = function(Options: Options?)\n\t\tif Started then\n\t\t\treturn\n\t\tend\n\n\t\t--// Validation \\\\--\n\t\tOptions = Options or {}\n\t\tdo\n\t\t\tConnectionsEnabled = Options.Connections ~= false\n\t\t\tCallbacksEnabled = Options.Callbacks ~= false\n\t\t\tConnectionHookEnabled = Options.HookConnections ~= false\n\t\tend\n\n\t\tif not ConnectionsEnabled and not CallbacksEnabled then\n\t\t\treturn\n\t\tend\n\n\t\tStarted = true\n\n\t\t--// Listeners \\\\--\n\t\tif CallbacksEnabled then\n\t\t\tif wax.shared.ExecutorSupport[\"setstackhidden\"].IsWorking then\n\t\t\t\tsetstackhidden(HandleCallbackLogging, true)\n\t\t\tend\n\n\t\t\tSetupCallbackAssignmentHook()\n\t\tend\n\n\t\tif ConnectionsEnabled and ConnectionHookEnabled then\n\t\t\tSetupConnectionAssignmentHook()\n\t\tend\n\n\t\twax.shared.Connect(game.DescendantAdded:Connect(function(instance)\n\t\t\tHandleInstance(cloneref(instance))\n\t\tend))\n\n\t\t--// Initialization \\\\--\n\t\tlocal ClassesToSearch = {}\n\t\tdo\n\t\t\tif ConnectionsEnabled then\n\t\t\t\ttable.insert(ClassesToSearch, \"RemoteEvent\")\n\t\t\t\ttable.insert(ClassesToSearch, \"UnreliableRemoteEvent\")\n\t\t\t\ttable.insert(ClassesToSearch, \"BindableEvent\")\n\t\t\tend\n\t\t\tif CallbacksEnabled then\n\t\t\t\ttable.insert(ClassesToSearch, \"RemoteFunction\")\n\t\t\t\ttable.insert(ClassesToSearch, \"BindableFunction\")\n\t\t\tend\n\t\tend\n\n\t\tlocal Categories = {\n\t\t\tgame:QueryDescendants(table.concat(ClassesToSearch, \", \")),\n\t\t}\n\t\tif wax.shared.ExecutorSupport[\"getnilinstances\"].IsWorking then\n\t\t\ttable.insert(Categories, getnilinstances())\n\t\tend\n\n\t\tfor _, Category in Categories do\n\t\t\tfor _, TargetInstance in next, Category do\n\t\t\t\tHandleInstance(cloneref(TargetInstance))\n\t\t\tend\n\t\tend\n\tend\nend\n--#endregion\n\ntask.spawn(wax.shared.IncomingInterceptor, {\n\tConnections = false,\n\tCallbacks = Data.IncomingCallbacks,\n\tHookConnections = false,\n})\n\nif Data.Outgoing then\n\ttask.spawn(function()\n\t\tlocal NamecallMethods = {\n\t\t\t[\"FireServer\"] = CreateLookupTable({\"RemoteEvent\", \"UnreliableRemoteEvent\"}),\n\t\t\t[\"fireServer\"] = CreateLookupTable({\"RemoteEvent\", \"UnreliableRemoteEvent\"}),\n\t\t\t\n\t\t\t[\"InvokeServer\"] = CreateLookupTable({\"RemoteFunction\"}),\n\t\t\t[\"invokeServer\"] = CreateLookupTable({\"RemoteFunction\"}),\n\n\t\t\t[\"Fire\"] = CreateLookupTable({\"BindableEvent\"}),\n\t\t\t[\"fire\"] = CreateLookupTable({\"BindableEvent\"}),\n\t\t\t\n\t\t\t[\"Invoke\"] = CreateLookupTable({\"BindableFunction\"}),\n\t\t\t[\"invoke\"] = CreateLookupTable({\"BindableFunction\"}),\n\t\t}\n\t\tlocal AllowedClassNames =\n\t\t\tCreateLookupTable({ \"RemoteEvent\", \"RemoteFunction\", \"UnreliableRemoteEvent\", \"BindableEvent\", \"BindableFunction\" })\n\n\t\t--[[\n\t\t\tReturns the calling function via `debug.info`\n\n\t\t\t@return `function | nil` The calling function or nil if not found.\n\t\t]]\n\t\tlocal function getcallingfunction()\n\t\t\tlocal BaseLevel = if wax.shared.IsUsingOthHooks then 3 else 5\n\n\t\t\tfor i = BaseLevel, 10 do\n\t\t\t\tlocal Function, Source = debug.info(i, \"fs\")\n\t\t\t\tif not Function or not Source then\n\t\t\t\t\tbreak\n\t\t\t\tend\n\n\t\t\t\tif Source == \"[C]\" then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\n\t\t\t\treturn Function\n\t\t\tend\n\n\t\t\treturn debug.info(BaseLevel, \"f\")\n\t\tend\n\n\t\t--[[\n\t\t\tReturns the calling line of the script that called the function via `debug.info`\n\n\t\t\t@return number Returns the line number of the calling script.\n\t\t]]\n\t\tlocal function getcallingline()\n\t\t\tlocal BaseLevel = if wax.shared.IsUsingOthHooks then 3 else 5\n\n\t\t\tfor i = BaseLevel, 10 do\n\t\t\t\tlocal Source, Line = debug.info(i, \"sl\")\n\t\t\t\tif not Source then\n\t\t\t\t\tbreak\n\t\t\t\tend\n\n\t\t\t\tif Source == \"[C]\" then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\n\t\t\t\treturn Line\n\t\t\tend\n\n\t\t\treturn debug.info(BaseLevel, \"l\")\n\t\tend\n\n\t\t--[[\n\t\t\tReturns the calling source of the script that called the function via `debug.info`\n\n\t\t\t@return string Returns the source of the calling script.\n\t\t]]\n\t\tlocal function getcallingsource()\n\t\t\tlocal BaseLevel = if wax.shared.IsUsingOthHooks then 3 else 5\n\n\t\t\tfor i = BaseLevel, 10 do\n\t\t\t\tlocal Source = debug.info(i, \"s\")\n\t\t\t\tif not Source then\n\t\t\t\t\tbreak\n\t\t\t\tend\n\n\t\t\t\tif Source == \"[C]\" then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\n\t\t\t\treturn Source\n\t\t\tend\n\n\t\t\treturn debug.info(BaseLevel, \"s\")\n\t\tend\n\n\t\t--[[\n\t\t\tGets the log for a specific instance and direction.\n\n\t\t\t@param Instance: The instance that was called.\n\t\t\t@param Direction: The direction of the log (Outgoing, Incoming).\n\t\t\t@return Log: The log for the instance and direction.\n\t\t]]\n\t\tlocal function GetLog(Instance: Instance, Direction: \"Outgoing\" | \"Incoming\")\n\t\t\tlocal DebugId = wax.shared.GetDebugId(Instance)\n\n\t\t\tlocal LogsInDirection = wax.shared.Logs[Direction]\n\t\t\tif not LogsInDirection then\n\t\t\t\treturn nil\n\t\t\tend\n\n\t\t\tlocal Log = LogsInDirection[DebugId]\n\t\t\tif not Log then\n\t\t\t\tLog = wax.shared.NewLog(Instance, Direction, getcallingscript(), DebugId)\n\t\t\tend\n\n\t\t\treturn Log\n\t\tend\n\n\t\t--[[\n\t\t\tHandles logging for a result of a remote function.\n\t\t\t@param Log The log to use.\n\t\t\t@param Arguments The arguments to use.\n\t\t\t@param ... The result to log.\n\t\t\t@return The result.\n\t\t]]\n\t\tlocal function HandleLoggingResult(Log, Info, ResultKey, ...)\n\t\t\tlocal Result = wax.shared.SafePack.Pack(...)\n\t\t\tInfo[ResultKey] = Result\n\t\t\tLog:Call(Info)\n\n\t\t\treturn ...\n\t\tend\n\n\t\t--[[\n\t\t\tHandles the logging for a specific instance and method.\n\n\t\t\t@param Instance: The instance that was called.\n\t\t\t@param Method: The method that was called (e.g., \"OnClientEvent\").\n\t\t\t@param ... The arguments passed from the server to the client.\n\t\t]]\n\t\tlocal function HandleLogging(TargetInstance: Instance, Method: string, OldFunction: (...any) -> ...any, ...)\n\t\t\tlocal Log = GetLog(TargetInstance, \"Outgoing\")\n\t\t\tif not Log then\n\t\t\t\treturn OldFunction(...)\n\t\t\tend\n\t\t\tlocal Arguments = wax.shared.SafePack.Pack(select(2, ...))\n\n\t\t\tlocal Info = {\n\t\t\t\tArguments = Arguments,\n\t\t\t\tOrigin = getcallingscript(),\n\t\t\t\tFunction = getcallingfunction(),\n\t\t\t\tLine = getcallingline(),\n\t\t\t\tSource = getcallingsource(),\n\t\t\t\tIsExecutor = checkcaller(),\n\t\t\t}\n\t\t\tlocal ShouldBlock = Log:ShouldBlock(Info)\n\t\t\tLog:Call(Info)\n\t\t\tif ShouldBlock then\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal IsRemoteFunctionInvoke = (\n\t\t\t\tTargetInstance.ClassName == \"RemoteFunction\" and (Method == \"InvokeServer\" or Method == \"invokeServer\")\n\t\t\t)\n\n\t\t\tlocal IsBindableFunctionInvoke = (\n\t\t\t\tTargetInstance.ClassName == \"BindableFunction\" and (Method == \"Invoke\" or Method == \"invoke\")\n\t\t\t)\n\n\t\t\tif IsRemoteFunctionInvoke or IsBindableFunctionInvoke then\n\t\t\t\t--// Handle Incoming Log \\\\--\n\t\t\t\tLog = GetLog(TargetInstance, \"Incoming\")\n\t\t\t\tlocal RFResultInfo = {\n\t\t\t\t\tArguments = Arguments,\n\t\t\t\t\tInvokeResult = nil,\n\t\t\t\t\tOrigin = getcallingscript(),\n\t\t\t\t\tFunction = getcallingfunction(),\n\t\t\t\t\tLine = getcallingline(),\n\t\t\t\t\tSource = getcallingsource(),\n\t\t\t\t\tIsExecutor = checkcaller(),\n\t\t\t\t\tInvokeKind = \"Request\",\n\t\t\t\t}\n\n\t\t\t\tif Log:ShouldBlock(RFResultInfo) then\n\t\t\t\t\tLog:Call(RFResultInfo)\n\t\t\t\t\treturn\n\t\t\t\tend\n\n\t\t\t\treturn HandleLoggingResult(Log, RFResultInfo, \"InvokeResult\", OldFunction(...))\n\t\t\tend\n\n\t\t\treturn OldFunction(...)\n\t\tend\n\n\t\t--#region Hook Filters\n\t\tlocal SupportsFilters = wax.shared.ExecutorSupport[\"FilterBase\"].IsWorking\n\n\t\t--[[\n\t\t\tCreates a base filter for the outgoing hooks.\n\n\t\t\t@return `table` The base filter.\n\t\t]]\n\t\tlocal function CreateBaseFilter()\n\t\t\tlocal Filters = {}\n\t\t\tif not SupportsFilters then\n\t\t\t\treturn Filters\n\t\t\tend\n\n\t\t\t--// ignore communicator \\\\--\n\t\t\ttable.insert(Filters, NotFilter.new(ArgumentFilter.new(1, wax.shared.Communicator)))\n\t\t\ttable.insert(Filters, NotFilter.new(ArgumentFilter.new(1, wax.shared.ActorCommunicator)))\n\n\t\t\treturn Filters\n\t\tend\n\n\t\tlocal NamecallHookFilter = SupportsFilters and AllFilter.new((function()\n\t\t\tlocal Filters = CreateBaseFilter()\n\n\t\t\t--[[\n\t\t\t\tAllFilter:\n\t\t\t\t\tnot communicator\n\t\t\t\t\tnot actor communicator\n\t\t\t\t\tAnyFilter:\n\t\t\t\t\t\tRemoteEvent\n\t\t\t\t\t\t...\n\t\t\t\t\tAnyFilter:\n\t\t\t\t\t\tFireServer\n\t\t\t\t\t\tinvokeServer\n\t\t\t\t\t\t...\n\t\t\t--]]\n\n\t\t\t--// classnames \\\\--\n\t\t\tlocal AnyClassNameFilters = {}\n\t\t\tfor ClassName in AllowedClassNames do\n\t\t\t\ttable.insert(AnyClassNameFilters, InstanceTypeFilter.new(1, ClassName))\n\t\t\tend\n\t\t\t\n\t\t\t--// methods \\\\--\n\t\t\tlocal AnyNamecallMethoFilters = {}\n\t\t    for Method in NamecallMethods do\n\t\t        table.insert(AnyNamecallMethoFilters, NamecallFilter.new(Method))\n\t\t    end\n\n\t\t\ttable.insert(Filters, AnyFilter.new(AnyClassNameFilters))\n\t\t\ttable.insert(Filters, AnyFilter.new(AnyNamecallMethoFilters))\n\t\t    return Filters\n\t\tend)())\n\t\t--#endregion\n\n\t\t-- namecall hook\n\t\twax.shared.NamecallHook = wax.shared.Hooking.HookMetaMethod(game, \"__namecall\", function(...)\n\t\t\tlocal self = ...\n\t\t\tlocal Method = getnamecallmethod()\n\n\t\t\tif\n\t\t\t\ttypeof(self) == \"Instance\"\n\t\t\t\tand AllowedClassNames[self.ClassName]\n\t\t\t\tand not rawequal(self, wax.shared.Communicator)\n\t\t\t\tand not rawequal(self, wax.shared.ActorCommunicator)\n\t\t\t\tand (NamecallMethods[Method] and NamecallMethods[Method][self.ClassName])\n\t\t\t\tand not wax.shared.ShouldIgnore(self, getcallingscript())\n\t\t\tthen\n\t\t\t\treturn HandleLogging(cloneref(self), Method, wax.shared.NamecallHook, ...)\n\t\t\tend\n\n\t\t\treturn wax.shared.NamecallHook(...)\n\t\tend, NamecallHookFilter)\n\n\t\t-- function hooks\n\t\tlocal FunctionsToHook\n\t\tdo\n\t\t\tlocal BindableFunction = Instance.new(\"BindableFunction\")\n\t\t\tlocal BindableEvent = Instance.new(\"BindableEvent\")\n\n\t\t\tlocal RemoteFunction = Instance.new(\"RemoteFunction\")\n\t\t\tlocal RemoteEvent = Instance.new(\"RemoteEvent\")\n\t\t\tlocal UnreliableRemoteEvent = Instance.new(\"UnreliableRemoteEvent\")\n\n\t\t\tFunctionsToHook = {\n\t\t\t\tBindableFunction.Invoke,\n\t\t\t\tBindableEvent.Fire,\n\n\t\t\t\tRemoteFunction.InvokeServer,\n\t\t\t\tRemoteEvent.FireServer,\n\t\t\t\tUnreliableRemoteEvent.FireServer,\n\t\t\t}\n\n\t\t\tBindableFunction:Destroy()\n\t\t\tBindableEvent:Destroy()\n\n\t\t\tRemoteFunction:Destroy()\n\t\t\tRemoteEvent:Destroy()\n\t\t\tUnreliableRemoteEvent:Destroy()\n\t\tend\n\n\t\tlocal FunctionHookFilter = SupportsFilters and AllFilter.new((function()\n\t\t\tlocal Filters = CreateBaseFilter()\n\n\t\t\t--[[\n\t\t\t\tAllFilter:\n\t\t\t\t\tnot communicator\n\t\t\t\t\tnot actor communicator\n\t\t\t\t\tAnyFilter:\n\t\t\t\t\t\tRemoteEvent\n\t\t\t\t\t\tRemoteFunction\n\t\t\t\t\t\tUnreliableRemoteEvent\n\t\t\t\t\t\tBindableEvent\n\t\t\t\t\t\tBindableFunction\n\t\t\t--]]\n\n\t\t\tlocal ClassFilters = {}\n\t\t\tfor ClassName in AllowedClassNames do\n\t\t\t\ttable.insert(ClassFilters, InstanceTypeFilter.new(1, ClassName))\n\t\t\tend\n\n\t\t\ttable.insert(Filters, AnyFilter.new(ClassFilters))\n\t\t\treturn Filters\n\t\tend)())\n\n\t\tfor _, Function in next, FunctionsToHook do\n\t\t\tlocal Method = debug.info(Function, \"n\")\n\n\t\t\twax.shared.Hooks[Function] = wax.shared.Hooking.HookFunction(Function, function(...)\n\t\t\t\tlocal self = ...\n\n\t\t\t\tif\n\t\t\t\t\ttypeof(self) == \"Instance\"\n\t\t\t\t\tand AllowedClassNames[self.ClassName]\n\t\t\t\t\tand not rawequal(self, wax.shared.Communicator)\n\t\t\t\t\tand not wax.shared.ShouldIgnore(self, getcallingscript())\n\t\t\t\tthen\n\t\t\t\t\treturn HandleLogging(cloneref(self), Method, wax.shared.Hooks[Function], ...)\n\t\t\t\tend\n\n\t\t\t\treturn wax.shared.Hooks[Function](...)\n\t\t\tend, FunctionHookFilter)\n\t\tend\n\tend)\nend\n\ntask.spawn(function()\n\tlocal getrawmetatable = getrawmetatable or debug.getmetatable\n\n\twax.shared.Communicator.Event:Connect(function(Type, ...)\n\t\tif Type ~= \"Unload\" then\n\t\t\treturn\n\t\tend\n\n\t\tlocal gameMetatable = getrawmetatable(game)\n\n\t\tif wax.shared.ExecutorSupport[\"oth\"].IsWorking then\n\t\t\tif Data.Outgoing then\n\t\t\t\tpcall(oth.unhook, gameMetatable.__namecall)\n\t\t\tend\n\t\t\tif Data.IncomingCallbacks then\n\t\t\t\tpcall(oth.unhook, gameMetatable.__newindex)\n\t\t\tend\n\t\telse\n\t\t\tif wax.shared.ExecutorSupport[\"restorefunction\"].IsWorking and wax.shared.ExecutorSupport[\"hookmetamethod\"].IsWorking then\n\t\t\t\tif Data.Outgoing then\n\t\t\t\t\tpcall(restorefunction, gameMetatable.__namecall)\n\t\t\t\tend\n\t\t\t\tif Data.IncomingCallbacks then\n\t\t\t\t\tpcall(restorefunction, gameMetatable.__newindex)\n\t\t\t\tend\n\t\t\telse\n\t\t\t\tif Data.Outgoing then\n\t\t\t\t\twax.shared.Hooking.HookMetaMethod(game, \"__namecall\", wax.shared.NamecallHook)\n\t\t\t\tend\n\t\t\t\tif Data.IncomingCallbacks then\n\t\t\t\t\twax.shared.Hooking.HookMetaMethod(game, \"__newindex\", wax.shared.NewIndexHook)\n\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\n\t\t\tif Data.IncomingCallbacks and wax.shared.RestoreCallbackDetours then\n\t\t\t\twax.shared.RestoreCallbackDetours()\n\t\t\tend\n\n\t\t\tfor Function, Original in pairs(wax.shared.Hooks) do\n\t\t\tif wax.shared.ExecutorSupport[\"oth\"].IsWorking then\n\t\t\t\ttask.spawn(pcall, oth.unhook, Function)\n\t\t\telseif wax.shared.ExecutorSupport[\"restorefunction\"].IsWorking then\n\t\t\t\ttask.spawn(pcall, wax.shared.restorefunction, Function)\n\t\t\telse\n\t\t\t\tpcall(wax.shared.Hooking.HookFunction, Function, Original)\n\t\t\tend\n\t\tend\n\n\t\ttask.defer(function()\n\t\t\tgetgenv().CobaltInitialized = false\n\t\tend)\n\tend)\nend)\n"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        8,
+                                        1,
+                                        {
+                                            "Interceptors"
+                                        },
+                                        {
+                                            {
+                                                10,
+                                                2,
+                                                {
+                                                    "Outgoing"
+                                                }
+                                            },
+                                            {
+                                                9,
+                                                2,
+                                                {
+                                                    "Incoming"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                11,
+                                2,
+                                {
+                                    "RakNet"
+                                },
+                                {
+                                    {
+                                        13,
+                                        1,
+                                        {
+                                            "Interceptors"
+                                        },
+                                        {
+                                            {
+                                                14,
+                                                2,
+                                                {
+                                                    "Incoming"
+                                                }
+                                            },
+                                            {
+                                                15,
+                                                2,
+                                                {
+                                                    "Outgoing"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        17,
+                                        2,
+                                        {
+                                            "PacketProcessor"
+                                        }
+                                    },
+                                    {
+                                        12,
+                                        2,
+                                        {
+                                            "InterceptorUtils"
+                                        }
+                                    },
+                                    {
+                                        16,
+                                        2,
+                                        {
+                                            "InvocationTracker"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             },
             {
@@ -24131,10 +24403,33 @@ local ObjectTree = {
                 },
                 {
                     {
-                        114,
+                        121,
                         2,
                         {
-                            "Signal"
+                            "Validation"
+                        },
+                        {
+                            {
+                                122,
+                                2,
+                                {
+                                    "Schema"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        110,
+                        2,
+                        {
+                            "SaveManager"
+                        }
+                    },
+                    {
+                        109,
+                        2,
+                        {
+                            "SafePack"
                         }
                     },
                     {
@@ -24159,33 +24454,12 @@ local ObjectTree = {
                                 },
                                 {
                                     {
-                                        51,
-                                        2,
-                                        {
-                                            "Constants"
-                                        }
-                                    },
-                                    {
-                                        52,
-                                        2,
-                                        {
-                                            "Lookup"
-                                        }
-                                    },
-                                    {
                                         53,
                                         1,
                                         {
                                             "Variant"
                                         },
                                         {
-                                            {
-                                                91,
-                                                2,
-                                                {
-                                                    "Parser"
-                                                }
-                                            },
                                             {
                                                 54,
                                                 1,
@@ -24194,143 +24468,10 @@ local ObjectTree = {
                                                 },
                                                 {
                                                     {
-                                                        70,
-                                                        2,
-                                                        {
-                                                            "nil"
-                                                        }
-                                                    },
-                                                    {
-                                                        83,
-                                                        2,
-                                                        {
-                                                            "sharedString"
-                                                        }
-                                                    },
-                                                    {
-                                                        59,
-                                                        2,
-                                                        {
-                                                            "buffer"
-                                                        }
-                                                    },
-                                                    {
-                                                        73,
-                                                        2,
-                                                        {
-                                                            "numberSequence"
-                                                        }
-                                                    },
-                                                    {
-                                                        88,
-                                                        2,
-                                                        {
-                                                            "uniqueId"
-                                                        }
-                                                    },
-                                                    {
-                                                        58,
-                                                        2,
-                                                        {
-                                                            "brickColor"
-                                                        }
-                                                    },
-                                                    {
-                                                        76,
-                                                        2,
-                                                        {
-                                                            "pathWaypoint"
-                                                        }
-                                                    },
-                                                    {
-                                                        81,
-                                                        2,
-                                                        {
-                                                            "replicationPV"
-                                                        }
-                                                    },
-                                                    {
-                                                        60,
-                                                        2,
-                                                        {
-                                                            "cframe"
-                                                        }
-                                                    },
-                                                    {
-                                                        71,
-                                                        2,
-                                                        {
-                                                            "number"
-                                                        }
-                                                    },
-                                                    {
-                                                        77,
-                                                        2,
-                                                        {
-                                                            "physicalProperties"
-                                                        }
-                                                    },
-                                                    {
-                                                        55,
-                                                        2,
-                                                        {
-                                                            "animTrack"
-                                                        }
-                                                    },
-                                                    {
-                                                        85,
-                                                        2,
-                                                        {
-                                                            "tuple"
-                                                        }
-                                                    },
-                                                    {
-                                                        65,
-                                                        2,
-                                                        {
-                                                            "dictionary"
-                                                        }
-                                                    },
-                                                    {
-                                                        79,
-                                                        2,
-                                                        {
-                                                            "rect"
-                                                        }
-                                                    },
-                                                    {
-                                                        57,
-                                                        2,
-                                                        {
-                                                            "bool"
-                                                        }
-                                                    },
-                                                    {
                                                         69,
                                                         2,
                                                         {
                                                             "instance"
-                                                        }
-                                                    },
-                                                    {
-                                                        63,
-                                                        2,
-                                                        {
-                                                            "content"
-                                                        }
-                                                    },
-                                                    {
-                                                        72,
-                                                        2,
-                                                        {
-                                                            "numberRange"
-                                                        }
-                                                    },
-                                                    {
-                                                        68,
-                                                        2,
-                                                        {
-                                                            "font"
                                                         }
                                                     },
                                                     {
@@ -24341,45 +24482,10 @@ local ObjectTree = {
                                                         }
                                                     },
                                                     {
-                                                        64,
+                                                        68,
                                                         2,
                                                         {
-                                                            "dateTime"
-                                                        }
-                                                    },
-                                                    {
-                                                        82,
-                                                        2,
-                                                        {
-                                                            "securityCapabilities"
-                                                        }
-                                                    },
-                                                    {
-                                                        61,
-                                                        2,
-                                                        {
-                                                            "color3"
-                                                        }
-                                                    },
-                                                    {
-                                                        90,
-                                                        2,
-                                                        {
-                                                            "vector"
-                                                        }
-                                                    },
-                                                    {
-                                                        89,
-                                                        2,
-                                                        {
-                                                            "variant"
-                                                        }
-                                                    },
-                                                    {
-                                                        87,
-                                                        2,
-                                                        {
-                                                            "udim2"
+                                                            "font"
                                                         }
                                                     },
                                                     {
@@ -24390,38 +24496,31 @@ local ObjectTree = {
                                                         }
                                                     },
                                                     {
+                                                        73,
+                                                        2,
+                                                        {
+                                                            "numberSequence"
+                                                        }
+                                                    },
+                                                    {
+                                                        65,
+                                                        2,
+                                                        {
+                                                            "dictionary"
+                                                        }
+                                                    },
+                                                    {
+                                                        81,
+                                                        2,
+                                                        {
+                                                            "replicationPV"
+                                                        }
+                                                    },
+                                                    {
                                                         84,
                                                         2,
                                                         {
                                                             "string"
-                                                        }
-                                                    },
-                                                    {
-                                                        66,
-                                                        2,
-                                                        {
-                                                            "enum"
-                                                        }
-                                                    },
-                                                    {
-                                                        80,
-                                                        2,
-                                                        {
-                                                            "region3"
-                                                        }
-                                                    },
-                                                    {
-                                                        86,
-                                                        2,
-                                                        {
-                                                            "udim"
-                                                        }
-                                                    },
-                                                    {
-                                                        62,
-                                                        2,
-                                                        {
-                                                            "colorSequence"
                                                         }
                                                     },
                                                     {
@@ -24432,6 +24531,160 @@ local ObjectTree = {
                                                         }
                                                     },
                                                     {
+                                                        56,
+                                                        2,
+                                                        {
+                                                            "axes"
+                                                        }
+                                                    },
+                                                    {
+                                                        63,
+                                                        2,
+                                                        {
+                                                            "content"
+                                                        }
+                                                    },
+                                                    {
+                                                        62,
+                                                        2,
+                                                        {
+                                                            "colorSequence"
+                                                        }
+                                                    },
+                                                    {
+                                                        88,
+                                                        2,
+                                                        {
+                                                            "uniqueId"
+                                                        }
+                                                    },
+                                                    {
+                                                        72,
+                                                        2,
+                                                        {
+                                                            "numberRange"
+                                                        }
+                                                    },
+                                                    {
+                                                        59,
+                                                        2,
+                                                        {
+                                                            "buffer"
+                                                        }
+                                                    },
+                                                    {
+                                                        80,
+                                                        2,
+                                                        {
+                                                            "region3"
+                                                        }
+                                                    },
+                                                    {
+                                                        89,
+                                                        2,
+                                                        {
+                                                            "variant"
+                                                        }
+                                                    },
+                                                    {
+                                                        90,
+                                                        2,
+                                                        {
+                                                            "vector"
+                                                        }
+                                                    },
+                                                    {
+                                                        87,
+                                                        2,
+                                                        {
+                                                            "udim2"
+                                                        }
+                                                    },
+                                                    {
+                                                        55,
+                                                        2,
+                                                        {
+                                                            "animTrack"
+                                                        }
+                                                    },
+                                                    {
+                                                        86,
+                                                        2,
+                                                        {
+                                                            "udim"
+                                                        }
+                                                    },
+                                                    {
+                                                        66,
+                                                        2,
+                                                        {
+                                                            "enum"
+                                                        }
+                                                    },
+                                                    {
+                                                        77,
+                                                        2,
+                                                        {
+                                                            "physicalProperties"
+                                                        }
+                                                    },
+                                                    {
+                                                        64,
+                                                        2,
+                                                        {
+                                                            "dateTime"
+                                                        }
+                                                    },
+                                                    {
+                                                        57,
+                                                        2,
+                                                        {
+                                                            "bool"
+                                                        }
+                                                    },
+                                                    {
+                                                        83,
+                                                        2,
+                                                        {
+                                                            "sharedString"
+                                                        }
+                                                    },
+                                                    {
+                                                        70,
+                                                        2,
+                                                        {
+                                                            "nil"
+                                                        }
+                                                    },
+                                                    {
+                                                        60,
+                                                        2,
+                                                        {
+                                                            "cframe"
+                                                        }
+                                                    },
+                                                    {
+                                                        82,
+                                                        2,
+                                                        {
+                                                            "securityCapabilities"
+                                                        }
+                                                    },
+                                                    {
+                                                        79,
+                                                        2,
+                                                        {
+                                                            "rect"
+                                                        }
+                                                    },
+                                                    {
+                                                        85,
+                                                        2,
+                                                        {
+                                                            "tuple"
+                                                        }
+                                                    },
+                                                    {
                                                         75,
                                                         2,
                                                         {
@@ -24439,14 +24692,49 @@ local ObjectTree = {
                                                         }
                                                     },
                                                     {
-                                                        56,
+                                                        61,
                                                         2,
                                                         {
-                                                            "axes"
+                                                            "color3"
+                                                        }
+                                                    },
+                                                    {
+                                                        71,
+                                                        2,
+                                                        {
+                                                            "number"
+                                                        }
+                                                    },
+                                                    {
+                                                        76,
+                                                        2,
+                                                        {
+                                                            "pathWaypoint"
+                                                        }
+                                                    },
+                                                    {
+                                                        58,
+                                                        2,
+                                                        {
+                                                            "brickColor"
                                                         }
                                                     }
                                                 }
+                                            },
+                                            {
+                                                91,
+                                                2,
+                                                {
+                                                    "Parser"
+                                                }
                                             }
+                                        }
+                                    },
+                                    {
+                                        52,
+                                        2,
+                                        {
+                                            "Lookup"
                                         }
                                     },
                                     {
@@ -24462,7 +24750,67 @@ local ObjectTree = {
                                         {
                                             "Wrapper"
                                         }
+                                    },
+                                    {
+                                        51,
+                                        2,
+                                        {
+                                            "Constants"
+                                        }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        46,
+                        2,
+                        {
+                            "FileLog"
+                        }
+                    },
+                    {
+                        115,
+                        1,
+                        {
+                            "UI"
+                        },
+                        {
+                            {
+                                116,
+                                1,
+                                {
+                                    "Assets"
+                                },
+                                {
+                                    {
+                                        117,
+                                        2,
+                                        {
+                                            "Icons"
+                                        }
+                                    },
+                                    {
+                                        119,
+                                        2,
+                                        {
+                                            "Registry"
+                                        }
+                                    },
+                                    {
+                                        118,
+                                        2,
+                                        {
+                                            "Manager"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                120,
+                                2,
+                                {
+                                    "Interface"
                                 }
                             }
                         }
@@ -24491,100 +24839,10 @@ local ObjectTree = {
                         }
                     },
                     {
-                        23,
-                        1,
-                        {
-                            "CallFilter"
-                        },
-                        {
-                            {
-                                26,
-                                2,
-                                {
-                                    "RemoteFields"
-                                }
-                            },
-                            {
-                                24,
-                                2,
-                                {
-                                    "Manager"
-                                }
-                            },
-                            {
-                                27,
-                                2,
-                                {
-                                    "Schema"
-                                }
-                            },
-                            {
-                                25,
-                                2,
-                                {
-                                    "Operators"
-                                }
-                            }
-                        }
-                    },
-                    {
-                        95,
+                        44,
                         2,
                         {
-                            "Pagination"
-                        }
-                    },
-                    {
-                        115,
-                        1,
-                        {
-                            "UI"
-                        },
-                        {
-                            {
-                                120,
-                                2,
-                                {
-                                    "Interface"
-                                }
-                            },
-                            {
-                                116,
-                                1,
-                                {
-                                    "Assets"
-                                },
-                                {
-                                    {
-                                        117,
-                                        2,
-                                        {
-                                            "Icons"
-                                        }
-                                    },
-                                    {
-                                        118,
-                                        2,
-                                        {
-                                            "Manager"
-                                        }
-                                    },
-                                    {
-                                        119,
-                                        2,
-                                        {
-                                            "Registry"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    {
-                        93,
-                        2,
-                        {
-                            "Log"
+                            "Connect"
                         }
                     },
                     {
@@ -24602,13 +24860,6 @@ local ObjectTree = {
                                 }
                             },
                             {
-                                30,
-                                2,
-                                {
-                                    "Formatter"
-                                }
-                            },
-                            {
                                 37,
                                 1,
                                 {
@@ -24616,10 +24867,18 @@ local ObjectTree = {
                                 },
                                 {
                                     {
-                                        40,
+                                        38,
                                         2,
                                         {
-                                            "Hook"
+                                            "Actor"
+                                        }
+                                    },
+                                    {
+                                        42,
+                                        5,
+                                        {
+                                            "SessionHTMLView",
+                                            Value = "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>Cobalt - Session Viewer</title>\n    <link\n      rel=\"icon\"\n      type=\"image/png\"\n      href=\"https://cobalt-xil.pages.dev/Assets/Logo.png\"\n    />\n    <style>\n      :root {\n        --bg-color: #0b0b0b;\n        --surface-color: #161b22;\n        --border-color: #30363d;\n        --text-primary: #c9d1d9;\n        --text-secondary: #8b949e;\n        --accent-blue: #58a6ff;\n        --accent-green: #3fb950;\n        --accent-orange: #d29922;\n        --accent-red: #ff7b72;\n        --font-family: \"Inter\", -apple-system, BlinkMacSystemFont, \"Segoe UI\",\n          Helvetica, Arial, sans-serif;\n      }\n\n      body {\n        background-color: var(--bg-color);\n        color: var(--text-primary);\n        font-family: var(--font-family);\n        margin: 0;\n        padding: 0;\n        font-size: 13px;\n        height: 100vh;\n        display: flex;\n        flex-direction: column;\n        overflow: hidden;\n      }\n\n      /* Top Header */\n      .app-header {\n        height: 50px;\n        border-bottom: 1px solid var(--border-color);\n        display: flex;\n        align-items: center;\n        justify-content: space-between;\n        padding: 0 20px;\n        background-color: var(--bg-color);\n        flex-shrink: 0;\n        z-index: 10;\n      }\n\n      .brand {\n        display: flex;\n        align-items: center;\n        gap: 10px;\n        font-size: 16px;\n        font-weight: 600;\n        color: #fff;\n      }\n\n      .brand-icon {\n        width: 20px;\n        height: 20px;\n        background-image: url(\"https://cobalt-xil.pages.dev/Assets/Logo.png\");\n        background-size: contain;\n        background-repeat: no-repeat;\n        background-position: center;\n      }\n\n      .session-container {\n        position: relative;\n        display: flex;\n        flex-direction: column;\n        align-items: flex-end;\n      }\n\n      .session-info {\n        color: var(--text-secondary);\n        font-family: monospace;\n        font-size: 12px;\n        cursor: pointer;\n        padding: 2px 5px;\n        border-radius: 4px;\n        transition: background-color 0.2s ease;\n        user-select: none;\n      }\n\n      .session-info:hover {\n        background-color: #1c2128;\n      }\n\n      .session-id {\n        color: #fff;\n      }\n\n      .session-tooltip {\n        position: absolute;\n        top: 100%;\n        right: 0;\n        background-color: #1c2128;\n        border: 1px solid var(--border-color);\n        border-radius: 6px;\n        padding: 10px;\n        z-index: 100;\n        width: 250px;\n        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n        margin-top: 5px;\n        opacity: 0;\n        transform: translateY(-10px);\n        pointer-events: none;\n        visibility: hidden;\n        transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;\n      }\n\n      .session-tooltip::before {\n        content: \"\";\n        position: absolute;\n        top: -10px;\n        left: 0;\n        width: 100%;\n        height: 10px;\n        background: transparent;\n      }\n\n      .session-container:hover .session-tooltip,\n      .session-tooltip.visible {\n        opacity: 1;\n        transform: translateY(0);\n        pointer-events: auto;\n        visibility: visible;\n      }\n\n      .tooltip-row {\n        display: flex;\n        justify-content: space-between;\n        margin-bottom: 5px;\n        font-size: 11px;\n      }\n\n      .tooltip-label {\n        color: var(--text-secondary);\n      }\n\n      .tooltip-value {\n        color: var(--text-primary);\n        font-family: monospace;\n        user-select: text;\n      }\n\n      /* Mobile Responsiveness */\n      @media (max-width: 768px) {\n        .app-header {\n          height: auto;\n          flex-wrap: wrap;\n          padding: 10px;\n          gap: 10px;\n        }\n\n        .brand {\n          font-size: 14px;\n        }\n\n        .session-container {\n          align-items: flex-start;\n          display: none;\n          /* Hide session info on mobile to save space */\n        }\n\n        .trace-toolbar {\n          height: auto;\n          flex-wrap: wrap;\n          padding: 10px;\n          gap: 10px;\n          justify-content: space-between;\n        }\n\n        /* Hide non-essential info on mobile */\n        .trace-toolbar > div:first-child,\n        #statsLabel {\n          display: none;\n        }\n\n        .search-widget {\n          width: 100%;\n          order: 3;\n          margin-top: 5px;\n        }\n\n        .view-toggle {\n          width: 100%;\n          display: flex;\n        }\n\n        .view-btn {\n          flex: 1;\n          text-align: center;\n        }\n\n        .row-list {\n          width: 60vw;\n          /* Use viewport width to prevent runaway expansion */\n        }\n\n        .col-list {\n          width: 60vw;\n          flex: none;\n        }\n\n        .details-panel.visible {\n          position: fixed;\n          top: 0;\n          left: 0;\n          width: 100%;\n          height: 100%;\n          z-index: 1000;\n          border-left: none;\n        }\n\n        .details-header-top {\n          margin-top: 10px;\n        }\n\n        /* Fix Details Header Overflow */\n        .details-title-group {\n          min-width: 0;\n          flex: 1;\n          margin-right: 10px;\n        }\n\n        .details-name-large {\n          white-space: nowrap;\n          overflow: hidden;\n          text-overflow: ellipsis;\n        }\n\n        .details-actions {\n          flex-shrink: 0;\n        }\n\n        /* Allow wrapping for paths on mobile */\n        .details-path-row,\n        .origin-row,\n        .remote-path-copy {\n          white-space: normal !important;\n          word-break: break-all;\n        }\n      }\n\n      /* Scrollbars */\n      ::-webkit-scrollbar {\n        width: 10px;\n        height: 10px;\n      }\n\n      ::-webkit-scrollbar-track {\n        background: #0d1117;\n      }\n\n      ::-webkit-scrollbar-thumb {\n        background: #30363d;\n        border-radius: 5px;\n        border: 2px solid #0d1117;\n      }\n\n      ::-webkit-scrollbar-thumb:hover {\n        background: #8b949e;\n      }\n\n      ::-webkit-scrollbar-corner {\n        background: var(--bg-color);\n      }\n\n      /* Heatmap Styles */\n      .heatmap-container {\n        flex: 1;\n        display: none;\n        flex-direction: column;\n        overflow: hidden;\n        background-color: var(--bg-color);\n        position: relative;\n      }\n\n      .heatmap-container.visible {\n        display: flex;\n      }\n\n      .heatmap-canvas {\n        flex: 1;\n        width: 100%;\n        height: 100%;\n      }\n\n      .view-toggle {\n        display: flex;\n        background: #1c2128;\n        border: 1px solid var(--border-color);\n        border-radius: 4px;\n        overflow: hidden;\n      }\n\n      .view-btn {\n        padding: 4px 12px;\n        font-size: 12px;\n        cursor: pointer;\n        color: var(--text-secondary);\n        background: transparent;\n        border: none;\n        transition: all 0.2s;\n      }\n\n      .view-btn.active {\n        background: var(--accent-blue);\n        color: white;\n      }\n\n      .view-btn:hover:not(.active) {\n        background: #30363d;\n      }\n\n      /* Main Layout */\n      .main-container {\n        display: flex;\n        flex: 1;\n        overflow: hidden;\n      }\n\n      /* Left Panel: Trace View */\n      .trace-panel {\n        flex: 1;\n        display: flex;\n        flex-direction: column;\n        border-right: 1px solid var(--border-color);\n        min-width: 0;\n        overflow: hidden;\n      }\n\n      .trace-toolbar {\n        height: 40px;\n        border-bottom: 1px solid var(--border-color);\n        display: flex;\n        align-items: center;\n        padding: 0 10px;\n        gap: 10px;\n        background-color: var(--bg-color);\n        flex-shrink: 0;\n      }\n\n      .search-widget {\n        display: flex;\n        flex-direction: column;\n        background-color: var(--bg-color);\n        border: 1px solid var(--border-color);\n        border-radius: 6px;\n        width: 320px;\n        position: relative;\n        transition: border-color 0.2s ease, border-radius 0.2s ease;\n        box-sizing: border-box;\n      }\n\n      .search-widget:focus-within {\n        border-color: var(--accent-blue);\n      }\n\n      .search-widget:focus-within > .search-options {\n        border-color: var(--accent-blue);\n      }\n\n      .search-widget.expanded {\n        border-bottom-left-radius: 0;\n        border-bottom-right-radius: 0;\n        border-bottom-color: transparent;\n      }\n\n      .search-row {\n        display: flex;\n        align-items: center;\n        padding: 4px;\n      }\n\n      .search-chevron {\n        cursor: pointer;\n        padding: 2px;\n        color: var(--text-secondary);\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        transition: transform 0.2s ease, color 0.2s ease;\n        width: 20px;\n        height: 20px;\n        border-radius: 4px;\n      }\n\n      .search-chevron:hover {\n        background-color: rgba(255, 255, 255, 0.1);\n        color: var(--text-primary);\n      }\n\n      .search-chevron.expanded {\n        transform: rotate(90deg);\n      }\n\n      .search-input-container {\n        flex: 1;\n        display: flex;\n        align-items: center;\n        margin-left: 4px;\n      }\n\n      .search-input {\n        background: transparent;\n        border: none;\n        color: var(--text-primary);\n        font-size: 12px;\n        width: 100%;\n        outline: none;\n        height: 20px;\n      }\n\n      .search-options {\n        transition: border-color 0.2s ease, border-radius 0.2s ease;\n        display: none;\n        padding: 10px;\n        border: 1px solid var(--border-color);\n        border-top: none;\n        background-color: var(--bg-color);\n        flex-direction: column;\n        gap: 12px;\n        position: absolute;\n        top: 100%;\n        left: -1px;\n        right: -1px;\n        z-index: 100;\n        border-bottom-left-radius: 6px;\n        border-bottom-right-radius: 6px;\n        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);\n        box-sizing: border-box;\n      }\n\n      .search-options.visible {\n        display: flex;\n      }\n\n      .time-range-row {\n        display: flex;\n        align-items: center;\n        gap: 8px;\n        font-size: 11px;\n        color: var(--text-secondary);\n      }\n\n      .filter-options-row {\n        display: flex;\n        flex-wrap: wrap;\n        gap: 8px;\n        padding-top: 8px;\n        border-top: 1px solid var(--border-color);\n      }\n\n      .filter-checkbox-label {\n        display: flex;\n        align-items: center;\n        gap: 4px;\n        font-size: 11px;\n        color: var(--text-secondary);\n        cursor: pointer;\n        user-select: none;\n      }\n\n      .filter-checkbox-label:hover {\n        color: var(--text-primary);\n      }\n\n      .filter-checkbox {\n        accent-color: var(--accent-blue);\n      }\n\n      .time-input-styled {\n        background-color: #161b22;\n        border: 1px solid var(--border-color);\n        color: var(--text-primary);\n        border-radius: 4px;\n        padding: 4px 8px;\n        width: 60px;\n        outline: none;\n        font-size: 11px;\n        transition: border-color 0.2s ease;\n        margin: 0 2px;\n      }\n\n      .time-input-styled:focus {\n        border-color: var(--accent-blue);\n      }\n\n      .unit-select {\n        background-color: #161b22;\n        border: 1px solid var(--border-color);\n        color: var(--text-primary);\n        border-radius: 4px;\n        outline: none;\n        font-size: 11px;\n        padding: 3px 6px;\n        cursor: pointer;\n        transition: border-color 0.2s ease;\n      }\n\n      .unit-select:focus {\n        border-color: var(--accent-blue);\n      }\n\n      .trace-header-row {\n        display: flex;\n        height: 30px;\n        border-bottom: 1px solid var(--border-color);\n        background-color: var(--surface-color);\n        font-size: 11px;\n        color: var(--text-secondary);\n        line-height: 30px;\n        flex-shrink: 0;\n      }\n\n      .col-list {\n        width: 300px;\n        padding-left: 15px;\n        border-right: 1px solid var(--border-color);\n        flex-shrink: 0;\n        z-index: 5;\n        background-color: var(--surface-color);\n        box-sizing: border-box;\n        /* Match row-list */\n      }\n\n      .col-timeline {\n        flex: 1;\n        position: relative;\n        overflow: hidden;\n        min-width: calc(100vw - 300px);\n      }\n\n      .timeline-ruler {\n        position: relative;\n        top: 0;\n        left: 0;\n        height: 100%;\n        pointer-events: none;\n      }\n\n      .tick {\n        position: absolute;\n        top: 0;\n        bottom: 0;\n        border-left: 1px solid #30363d;\n        font-size: 10px;\n        color: #484f58;\n        padding-left: 4px;\n      }\n\n      .trace-rows {\n        flex: 1;\n        overflow: auto;\n        /* Ensure both scrollbars appear */\n        position: relative;\n        contain: strict;\n      }\n\n      .virtual-spacer {\n        position: absolute;\n        top: 0;\n        left: 0;\n        width: 1px;\n      }\n\n      .virtual-content {\n        position: absolute;\n        top: 0;\n        left: 0;\n        width: 100%;\n      }\n\n      .trace-row {\n        display: flex;\n        height: 28px;\n        /* align-items: center;  Removed to allow children to stretch */\n        cursor: pointer;\n        /* border-bottom: 1px solid #1c2128; Moved to children */\n        width: fit-content;\n        min-width: 100%;\n        transition: background-color 0.1s ease;\n        box-sizing: border-box;\n      }\n\n      .trace-row:hover {\n        background-color: #1c2128;\n      }\n\n      .trace-row.selected {\n        background-color: rgba(88, 166, 255, 0.1);\n      }\n\n      .trace-row.hidden {\n        display: none;\n      }\n\n      .trace-row:hover * {\n        background-color: #1c2128;\n      }\n\n      .trace-row.selected * {\n        background-color: #1c2333;\n      }\n\n      .row-list {\n        width: 300px;\n        padding-left: 15px;\n        /* Use box-shadow for sticky border to prevent it from disappearing */\n        box-shadow: 1px 0 0 0 var(--border-color);\n        border-right: none;\n        border-bottom: 1px solid #1c2128;\n        /* Added border here */\n        display: flex;\n        align-items: center;\n        overflow: hidden;\n        flex-shrink: 0;\n        box-sizing: border-box;\n        position: sticky;\n        left: 0;\n        background-color: var(--bg-color);\n        z-index: 2;\n        transition: background-color 0.1s ease;\n        height: 100%;\n      }\n\n      .row-timeline {\n        flex: 1;\n        position: relative;\n        height: 100%;\n        overflow: hidden;\n        border-bottom: 1px solid #1c2128;\n        /* Added border here */\n        box-sizing: border-box;\n        /* Ensure border is inside height */\n      }\n\n      .type-icon {\n        width: 16px;\n        height: 16px;\n        margin-right: 8px;\n        flex-shrink: 0;\n        background-size: contain;\n        background-repeat: no-repeat;\n        background-position: center;\n      }\n\n      .remote-name {\n        white-space: nowrap;\n        overflow: hidden;\n        text-overflow: ellipsis;\n        color: var(--text-primary);\n        font-size: 12px;\n      }\n\n      .timeline-marker {\n        position: absolute;\n        top: 10px;\n        height: 8px;\n        min-width: 4px;\n        border-radius: 4px;\n        opacity: 0.9;\n      }\n\n      .timeline-marker.incoming {\n        background: linear-gradient(90deg, var(--accent-green), #2ea043);\n      }\n\n      .timeline-marker.outgoing {\n        background: linear-gradient(90deg, var(--accent-orange), #b08800);\n      }\n\n      /* Right Panel: Details */\n      .details-panel {\n        width: 0;\n        opacity: 0;\n        background-color: var(--bg-color);\n        border-left: 0 solid var(--border-color);\n        display: flex;\n        flex-direction: column;\n        padding: 0;\n        box-sizing: border-box;\n        overflow-y: auto;\n        overflow-x: hidden;\n        position: relative;\n        flex-shrink: 0;\n        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease,\n          padding 0.3s ease;\n      }\n\n      .details-panel.visible {\n        width: 450px;\n        opacity: 1;\n        padding: 20px;\n        border-left: 1px solid var(--border-color);\n      }\n\n      /* Header */\n      .details-header-top {\n        display: flex;\n        align-items: center;\n        justify-content: space-between;\n        margin-bottom: 10px;\n      }\n\n      .details-title-group {\n        display: flex;\n        align-items: center;\n        gap: 10px;\n      }\n\n      .details-icon-large {\n        width: 32px;\n        height: 32px;\n        background-size: contain;\n        background-repeat: no-repeat;\n        background-position: center;\n      }\n\n      .details-name-large {\n        font-size: 20px;\n        font-weight: 600;\n        color: #fff;\n      }\n\n      .details-actions {\n        display: flex;\n        align-items: center;\n        gap: 10px;\n      }\n\n      .close-btn {\n        cursor: pointer;\n        color: var(--text-secondary);\n        font-size: 20px;\n        transition: color 0.2s ease;\n        line-height: 1;\n      }\n\n      .close-btn:hover {\n        color: #fff;\n      }\n\n      /* Unified Badge Style */\n      .badge-pill {\n        padding: 4px 12px;\n        border-radius: 20px;\n        font-size: 11px;\n        font-weight: 600;\n        text-transform: uppercase;\n        border: 1px solid;\n        letter-spacing: 0.5px;\n        white-space: nowrap;\n      }\n\n      .badge-pill.incoming {\n        color: var(--accent-green);\n        border-color: var(--accent-green);\n      }\n\n      .badge-pill.outgoing {\n        color: var(--accent-orange);\n        border-color: var(--accent-orange);\n      }\n\n      .badge-pill.executor {\n        color: var(--accent-green);\n        border-color: var(--accent-green);\n      }\n\n      .badge-pill.actor {\n        color: var(--accent-red);\n        border-color: var(--accent-red);\n        background: repeating-linear-gradient(\n          45deg,\n          transparent,\n          transparent 2px,\n          rgba(255, 123, 114, 0.1) 2px,\n          rgba(255, 123, 114, 0.1) 4px\n        );\n      }\n\n      .badge-pill.blocked {\n        color: var(--accent-red);\n        border-color: var(--accent-red);\n      }\n\n      .details-path-row {\n        color: var(--text-secondary);\n        font-size: 12px;\n        margin-bottom: 20px;\n        font-family: monospace;\n        white-space: nowrap;\n        text-overflow: ellipsis;\n        overflow: hidden;\n        height: 1.2em;\n      }\n\n      .remote-path-copy {\n        cursor: pointer;\n        color: var(--text-secondary);\n        font-size: 12px;\n        font-weight: normal;\n        transition: color 0.2s ease;\n        white-space: nowrap;\n        overflow: hidden;\n        text-overflow: ellipsis;\n        display: block;\n        width: 25%;\n      }\n\n      .remote-path-copy:hover {\n        color: var(--accent-blue);\n      }\n\n      /* Info Grid 2 */\n      .info-grid-2 {\n        display: flex;\n        gap: 20px;\n        margin-bottom: 25px;\n      }\n\n      .info-item-2 h4 {\n        margin: 0 0 6px 0;\n        color: var(--text-secondary);\n        font-size: 12px;\n        font-weight: normal;\n      }\n\n      .info-item-2 div {\n        font-size: 11px;\n        color: var(--text-primary);\n        font-family: monospace;\n      }\n\n      /* Info Grid */\n      .info-grid {\n        display: grid;\n        grid-template-columns: 1fr 1fr;\n        gap: 20px;\n        margin-bottom: 25px;\n      }\n\n      .info-item h4 {\n        margin: 0 0 6px 0;\n        color: var(--text-secondary);\n        font-size: 12px;\n        font-weight: normal;\n      }\n\n      .info-item div {\n        font-size: 14px;\n        color: var(--text-primary);\n        font-family: monospace;\n      }\n\n      .clickable-path {\n        border-bottom: 1px dashed var(--text-secondary);\n        cursor: pointer;\n        transition: color 0.2s, border-color 0.2s;\n      }\n\n      .clickable-path:hover {\n        color: var(--accent-blue);\n        border-color: var(--accent-blue);\n      }\n\n      /* Content Boxes */\n      .content-box {\n        border: 1px solid var(--border-color);\n        border-radius: 8px;\n        padding: 15px;\n        margin-bottom: 20px;\n        position: relative;\n        background-color: rgba(22, 27, 34, 0.5);\n      }\n\n      .box-title {\n        position: absolute;\n        top: -10px;\n        left: 10px;\n        background-color: var(--bg-color);\n        padding: 0 5px;\n        font-size: 11px;\n        color: var(--text-secondary);\n      }\n\n      .caller-header {\n        display: flex;\n        align-items: center;\n        gap: 10px;\n        margin-bottom: 15px;\n      }\n\n      .caller-icon {\n        color: var(--text-secondary);\n        display: flex;\n        align-items: center;\n        justify-content: center;\n      }\n\n      .caller-icon svg {\n        width: 24px;\n        height: 24px;\n      }\n\n      .caller-info {\n        flex: 1;\n        min-width: 0;\n        /* Critical for flex child truncation */\n      }\n\n      .caller-name {\n        color: var(--accent-blue);\n        font-family: monospace;\n        font-size: 14px;\n        margin-bottom: 2px;\n      }\n\n      .caller-source {\n        color: var(--text-secondary);\n        font-size: 11px;\n        font-family: monospace;\n        height: 1.2em;\n        white-space: nowrap;\n        overflow: hidden;\n        text-overflow: ellipsis;\n        display: block;\n      }\n\n      .flags-row {\n        display: flex;\n        gap: 10px;\n        margin-bottom: 10px;\n        align-items: center;\n      }\n\n      .origin-row {\n        font-size: 12px;\n        color: var(--text-primary);\n        font-family: monospace;\n        display: block;\n        white-space: nowrap;\n        height: 1.2em;\n        overflow: hidden;\n        text-overflow: ellipsis;\n        width: 35%;\n      }\n\n      /* Arguments */\n      .args-content {\n        font-family: \"Consolas\", \"Monaco\", monospace;\n        font-size: 12px;\n        white-space: pre-wrap;\n        overflow-x: auto;\n        color: #e0e0e0;\n        max-height: 300px;\n        overflow-y: auto;\n        line-height: 1.5;\n      }\n\n      /* Copy Button with Animation */\n      .copy-icon-btn {\n        position: absolute;\n        top: 10px;\n        right: 10px;\n        background: transparent;\n        border: 1px solid var(--border-color);\n        border-radius: 4px;\n        color: var(--text-secondary);\n        cursor: pointer;\n        width: 28px;\n        height: 28px;\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        transition: all 0.2s;\n        overflow: hidden;\n        /* Ensure check icon doesn't spill out */\n      }\n\n      .copy-icon-btn:hover {\n        border-color: var(--text-primary);\n        color: var(--text-primary);\n        background-color: var(--surface-color);\n      }\n\n      .copy-icon-btn svg {\n        width: 14px;\n        height: 14px;\n        position: absolute;\n        top: 50%;\n        left: 50%;\n        transform: translate(-50%, -50%) scale(1);\n        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);\n      }\n\n      .copy-icon-btn .icon-check {\n        transform: translate(-50%, -50%) scale(0);\n        color: var(--accent-green);\n      }\n\n      .copy-icon-btn.copied .icon-copy {\n        transform: translate(-50%, -50%) scale(0);\n      }\n\n      .copy-icon-btn.copied .icon-check {\n        transform: translate(-50%, -50%) scale(1);\n      }\n\n      /* Dropdown */\n      .dropdown-menu {\n        position: absolute;\n        top: 42px;\n        /* Button height + spacing */\n        right: 10px;\n        background-color: #1c2128;\n        border: 1px solid var(--border-color);\n        border-radius: 6px;\n        width: 160px;\n        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n        z-index: 50;\n        display: none;\n        overflow: hidden;\n      }\n\n      .dropdown-menu.visible {\n        display: block;\n      }\n\n      .dropdown-item {\n        padding: 8px 12px;\n        font-size: 12px;\n        color: var(--text-primary);\n        cursor: pointer;\n        transition: background-color 0.2s;\n        display: flex;\n        align-items: center;\n        gap: 8px;\n      }\n\n      .dropdown-item:hover {\n        background-color: var(--accent-blue);\n        color: #fff;\n      }\n\n      .dropdown-item svg {\n        width: 14px;\n        height: 14px;\n        opacity: 0.7;\n      }\n\n      /* Toast Notification */\n      .toast-container {\n        position: fixed;\n        bottom: 30px;\n        left: 50%;\n        transform: translateX(-50%) translateY(20px);\n        background-color: #1c2128;\n        border: 1px solid var(--border-color);\n        border-radius: 6px;\n        padding: 8px 16px;\n        color: #fff;\n        font-size: 12px;\n        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n        opacity: 0;\n        transition: opacity 0.3s, transform 0.3s;\n        pointer-events: none;\n        z-index: 1000;\n        display: flex;\n        align-items: center;\n        gap: 8px;\n      }\n\n      .toast-container.visible {\n        opacity: 1;\n        transform: translateX(-50%) translateY(0);\n      }\n\n      .toast-container svg {\n        width: 16px;\n        height: 16px;\n        color: var(--accent-green);\n      }\n\n      /* Syntax Highlighting */\n      .hl-str {\n        color: #a5d6ff;\n      }\n\n      .hl-num {\n        color: #79c0ff;\n      }\n\n      .hl-bool {\n        color: #ff7b72;\n      }\n\n      .hl-key {\n        color: #7ee787;\n      }\n\n      .hl-nil {\n        color: #ff7b72;\n      }\n\n      .footer {\n        height: 25px;\n        border-top: 1px solid var(--border-color);\n        display: flex;\n        align-items: center;\n        justify-content: space-between;\n        padding: 0 20px;\n        background-color: var(--bg-color);\n        color: var(--text-secondary);\n        font-size: 11px;\n        flex-shrink: 0;\n      }\n    </style>\n  </head>\n\n  <body>\n    <div class=\"app-header\">\n      <a\n        href=\"https://gitlab.com/upio/cobalt/-/tree/main\"\n        target=\"_blank\"\n        style=\"text-decoration: none\"\n      >\n        <div class=\"brand\">\n          <div class=\"brand-icon\"></div>\n          Cobalt - Session Viewer\n        </div>\n      </a>\n      <div class=\"session-container\">\n        <div class=\"session-info\">\n          Session / <span class=\"session-id\">{{SESSION_ID}}</span>\n        </div>\n        <div class=\"session-tooltip\">\n          <div class=\"tooltip-row\">\n            <span class=\"tooltip-label\">Start Time (tick)</span>\n            <span class=\"tooltip-value\">{{START_TIME}}</span>\n          </div>\n          <div class=\"tooltip-row\">\n            <span class=\"tooltip-label\">Place ID</span>\n            <span class=\"tooltip-value\">{{PLACE_ID}}</span>\n          </div>\n          <div class=\"tooltip-row\">\n            <span class=\"tooltip-label\">Job ID</span>\n            <span class=\"tooltip-value\">{{JOB_ID}}</span>\n          </div>\n        </div>\n      </div>\n    </div>\n\n    <div class=\"main-container\">\n      <!-- LEFT PANEL WRAPPER -->\n      <div\n        class=\"left-panel-wrapper\"\n        style=\"\n          flex: 1;\n          display: flex;\n          flex-direction: column;\n          border-right: 1px solid var(--border-color);\n          min-width: 0;\n          overflow: hidden;\n        \"\n      >\n        <!-- SHARED TOOLBAR -->\n        <div class=\"trace-toolbar\">\n          <div\n            style=\"\n              font-size: 11px;\n              color: var(--text-secondary);\n              margin-right: 20px;\n            \"\n          >\n            Started: {{DATE}}\n          </div>\n          <div style=\"flex: 1\"></div>\n          <div class=\"view-toggle\">\n            <button class=\"view-btn active\" onclick=\"switchView('timeline')\">\n              Timeline\n            </button>\n            <button class=\"view-btn\" onclick=\"switchView('heatmap')\">\n              Heatmap\n            </button>\n          </div>\n          <div class=\"divider\"></div>\n          <div class=\"search-widget\">\n            <div class=\"search-row\">\n              <div\n                class=\"search-chevron\"\n                onclick=\"toggleSearchOptions()\"\n                id=\"searchChevron\"\n              >\n                <svg\n                  width=\"16\"\n                  height=\"16\"\n                  viewBox=\"0 0 16 16\"\n                  fill=\"currentColor\"\n                >\n                  <path\n                    d=\"M6 4l4 4-4 4\"\n                    stroke=\"currentColor\"\n                    stroke-width=\"1.5\"\n                    fill=\"none\"\n                  />\n                </svg>\n              </div>\n              <div class=\"search-input-container\">\n                <input\n                  type=\"text\"\n                  class=\"search-input\"\n                  id=\"filterInput\"\n                  placeholder=\"Filter events...\"\n                  oninput=\"handleFilterInput()\"\n                />\n              </div>\n            </div>\n            <div class=\"search-options\" id=\"searchOptions\">\n              <div class=\"time-range-row\">\n                <span>Time Range:</span>\n                <input\n                  type=\"number\"\n                  class=\"time-input-styled\"\n                  id=\"minTimeInput\"\n                  placeholder=\"Start\"\n                  oninput=\"handleTimeInput()\"\n                />\n                <span>-</span>\n                <input\n                  type=\"number\"\n                  class=\"time-input-styled\"\n                  id=\"maxTimeInput\"\n                  placeholder=\"End\"\n                  oninput=\"handleTimeInput()\"\n                />\n                <select\n                  class=\"unit-select\"\n                  id=\"timeUnitSelect\"\n                  onchange=\"handleTimeInput()\"\n                >\n                  <option value=\"1\">s</option>\n                  <option value=\"0.001\">ms</option>\n                </select>\n              </div>\n              <div class=\"filter-options-row\">\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterIncoming\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Incoming</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterOutgoing\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Outgoing</label\n                >\n                <div\n                  style=\"\n                    width: 1px;\n                    height: 14px;\n                    background: var(--border-color);\n                    margin: 0 4px;\n                  \"\n                ></div>\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterActor\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Actor</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterNonActor\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Non-Actor</label\n                >\n                <div\n                  style=\"\n                    width: 1px;\n                    height: 14px;\n                    background: var(--border-color);\n                    margin: 0 4px;\n                  \"\n                ></div>\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterArgs\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Args</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterProto\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Proto</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterConst\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Const</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterHash\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Hash</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterSource\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Source</label\n                >\n              </div>\n            </div>\n          </div>\n        </div>\n\n        <!-- TIMELINE VIEW -->\n        <div class=\"trace-panel\" id=\"timelinePanel\" style=\"border-right: none\">\n          <div class=\"trace-header-row\">\n            <div class=\"col-list\">Remote</div>\n            <div class=\"col-timeline\" id=\"timelineHeader\">\n              <div class=\"timeline-ruler\" id=\"ruler\"></div>\n            </div>\n          </div>\n\n          <div class=\"trace-rows\" id=\"rowsContainer\">\n            <div id=\"virtualSpacer\" class=\"virtual-spacer\"></div>\n            <div id=\"virtualContent\" class=\"virtual-content\"></div>\n          </div>\n        </div>\n\n        <!-- HEATMAP VIEW -->\n        <div class=\"heatmap-container\" id=\"heatmapPanel\">\n          <div\n            id=\"heatmapScroll\"\n            style=\"\n              width: 100%;\n              height: 100%;\n              overflow-x: auto;\n              overflow-y: hidden;\n              position: relative;\n            \"\n          >\n            <div\n              id=\"heatmapSpacer\"\n              style=\"\n                height: 1px;\n                width: 100%;\n                position: absolute;\n                top: 0;\n                left: 0;\n                pointer-events: none;\n              \"\n            ></div>\n            <canvas\n              id=\"heatmapCanvas\"\n              class=\"heatmap-canvas\"\n              style=\"\n                position: sticky;\n                left: 0;\n                top: 0;\n                width: 100%;\n                height: 100%;\n              \"\n            ></canvas>\n          </div>\n          <div\n            id=\"heatmapTooltip\"\n            class=\"heatmap-tooltip\"\n            style=\"\n              display: none;\n              position: absolute;\n              background: #1c2128;\n              border: 1px solid #30363d;\n              padding: 4px 8px;\n              border-radius: 4px;\n              font-size: 11px;\n              color: #c9d1d9;\n              pointer-events: none;\n              z-index: 100;\n            \"\n          ></div>\n        </div>\n      </div>\n\n      <!-- RIGHT PANEL -->\n      <div class=\"details-panel\" id=\"detailsPanel\">\n        <div id=\"detailsContent\"></div>\n      </div>\n    </div>\n\n    <div class=\"footer\">\n      <div>Ended: {{END_DATE}}</div>\n      <span\n        id=\"statsLabel\"\n        style=\"\n          color: var(--text-secondary);\n          font-size: 11px;\n          margin-right: 10px;\n        \"\n      >\n        {{EVENT_COUNT}} Events \226\128\162 {{TOTAL_DURATION}}s\n      </span>\n    </div>\n\n    <!-- Toast Notification -->\n    <div id=\"toast\" class=\"toast-container\">\n      <svg\n        xmlns=\"http://www.w3.org/2000/svg\"\n        width=\"24\"\n        height=\"24\"\n        viewBox=\"0 0 24 24\"\n        fill=\"none\"\n        stroke=\"currentColor\"\n        stroke-width=\"2\"\n        stroke-linecap=\"round\"\n        stroke-linejoin=\"round\"\n        class=\"lucide lucide-check\"\n      >\n        <path d=\"M20 6 9 17l-5-5\" />\n      </svg>\n      <span id=\"toastMessage\">Copied to clipboard</span>\n    </div>\n\n    <!-- Data Script -->\n    <script type=\"application/json\" id=\"dictionary-data\">\n      {{DICTIONARY_JSON}}\n    </script>\n    <script type=\"application/json\" id=\"event-data\">\n      {{EVENTS_JSON}}\n    </script>\n\n    <script>\n      // Data Parsing\n      let startTime = {{START_TIME}}; // Seconds\n      const totalDuration = {{DURATION}};\n      const dictionary = JSON.parse(document.getElementById('dictionary-data').textContent);\n      const rawEvents = JSON.parse(document.getElementById('event-data').textContent);\n\n      // Reconstruct Events\n      const allEvents = rawEvents.map(e => ({\n        name: dictionary[e[0]],\n        className: dictionary[e[1]],\n        path: dictionary[e[2]],\n        type: dictionary[e[3]],\n        timestamp: e[4],\n        origin: dictionary[e[5]],\n\n        args: dictionary[e[6]],\n        method: dictionary[e[7]],\n\n        funcName: dictionary[e[8]],\n        funcLine: e[9],\n        funcSource: dictionary[e[10]],\n        isExecutor: e[11] === 1,\n        isActor: e[12] === 1,\n\n        funcHash: dictionary[e[13]],\n        upvalues: dictionary[e[14]],\n        protos: dictionary[e[15]],\n        constants: dictionary[e[16]],\n        isBlocked: e[17] === 1\n      }));\n\n      if (allEvents.length > 0) {\n        const minTimestamp = Math.min(...allEvents.map(e => e.timestamp));\n        if (minTimestamp < startTime) {\n          startTime = minTimestamp;\n        }\n      }\n\n      // Preprocess events\n      allEvents.forEach(evt => {\n        evt.relTime = Math.max(0, evt.timestamp - startTime);\n\n        const typeLower = evt.type.toLowerCase();\n        const methodLower = evt.method ? evt.method.toLowerCase() : '';\n\n        if (methodLower.includes('client') || typeLower.includes('client')) {\n          evt.typeClass = 'incoming';\n        } else {\n          evt.typeClass = 'outgoing';\n        }\n      });\n\n      // State\n      let filteredEvents = allEvents;\n      let zoomLevel = 1;\n      let selectedEvent = null;\n      let filterTimeout = null;\n      let filterMinTime = 0;\n      let filterMaxTime = totalDuration;\n\n      // Initialize Time Inputs\n      document.getElementById('minTimeInput').value = \"0\";\n      document.getElementById('maxTimeInput').value = totalDuration.toFixed(2);\n\n      // Virtual Scroll State\n      let lastStartIndex = -1;\n      let lastEndIndex = -1;\n      let isScrolling = false;\n\n      // DOM Elements\n      const rowsContainer = document.getElementById('rowsContainer');\n      const virtualSpacer = document.getElementById('virtualSpacer');\n      const virtualContent = document.getElementById('virtualContent');\n      const rulerContainer = document.getElementById('ruler');\n      const detailsPanel = document.getElementById('detailsPanel');\n      const detailsContent = document.getElementById('detailsContent');\n      const timelineHeader = document.getElementById('timelineHeader');\n      const statsLabel = document.getElementById('statsLabel');\n\n\n      // Heatmap State\n      let currentView = 'timeline';\n      let heatmapZoom = 1;\n      let detailsWasVisible = false;\n      const heatmapCanvas = document.getElementById('heatmapCanvas');\n      const heatmapTooltip = document.getElementById('heatmapTooltip');\n\n      const timelinePanel = document.getElementById('timelinePanel');\n      const heatmapPanel = document.getElementById('heatmapPanel');\n\n      // Heatmap Interaction\n      heatmapCanvas.addEventListener('wheel', (e) => {\n        if (currentView !== 'heatmap') return;\n        e.preventDefault();\n\n        const delta = e.deltaY > 0 ? 1.1 : 0.9;\n        heatmapZoom = Math.max(1, Math.min(50, heatmapZoom * delta));\n        renderHeatmap();\n      }, { passive: false });\n\n      heatmapCanvas.addEventListener('mousemove', (e) => {\n        if (currentView !== 'heatmap') return;\n        const rect = heatmapCanvas.getBoundingClientRect();\n        const x = e.clientX - rect.left;\n        const y = e.clientY - rect.top;\n\n        if (!window.lastHeatmapData) return;\n\n        const { sortedRemotes, rowHeight, binWidth, remotes, maxBinCount, timeBins, binDuration, margin, scrollLeft } = window.lastHeatmapData;\n        const width = heatmapPanel.clientWidth;\n        const height = heatmapPanel.clientHeight;\n\n        if (x < margin.left || x > width - margin.right || y < margin.top || y > height - margin.bottom) {\n          heatmapTooltip.style.display = 'none';\n          return;\n        }\n\n        const rowIndex = Math.floor((y - margin.top) / rowHeight);\n\n        // Calculate colIndex based on virtual position (x + scrollLeft)\n        const colIndex = Math.floor((x - margin.left + scrollLeft) / binWidth);\n\n        if (rowIndex >= 0 && rowIndex < sortedRemotes.length && colIndex >= 0 && colIndex < timeBins) {\n          const remote = sortedRemotes[rowIndex];\n          // Calculate count for this bin\n          let count = 0;\n          remotes[remote].forEach(evt => {\n            const binIndex = Math.min(Math.floor(evt.relTime / binDuration), timeBins - 1);\n            if (binIndex === colIndex) count++;\n          });\n\n          heatmapTooltip.style.display = 'block';\n          heatmapTooltip.innerHTML = `<b>${remote}</b><br>Time: ${(colIndex * binDuration).toFixed(1)}s<br>Count: ${count}`;\n\n          const tooltipWidth = heatmapTooltip.offsetWidth;\n          const panelWidth = heatmapPanel.clientWidth;\n\n          let leftPos = x + 10;\n          if (leftPos + tooltipWidth > panelWidth - 10) {\n            leftPos = x - tooltipWidth - 10;\n          }\n\n          heatmapTooltip.style.left = leftPos + 'px';\n          heatmapTooltip.style.top = (y + 10) + 'px';\n        } else {\n          heatmapTooltip.style.display = 'none';\n        }\n      });\n\n      heatmapCanvas.addEventListener('mouseleave', () => {\n        heatmapTooltip.style.display = 'none';\n      });\n\n      document.getElementById('heatmapScroll').addEventListener('scroll', () => {\n        if (currentView === 'heatmap') {\n          renderHeatmap();\n        }\n      });\n\n      function switchView(view) {\n        currentView = view;\n        document.querySelectorAll('.view-btn').forEach(btn => {\n          btn.classList.toggle('active', btn.innerText.toLowerCase() === view);\n        });\n\n        if (view === 'timeline') {\n          timelinePanel.style.display = 'flex';\n          heatmapPanel.classList.remove('visible');\n\n          if (detailsWasVisible) {\n            detailsPanel.classList.add('visible');\n          }\n\n          renderVirtualRows(true);\n        } else {\n          if (detailsPanel.classList.contains('visible')) {\n            detailsWasVisible = true;\n            detailsPanel.classList.remove('visible');\n          } else {\n            detailsWasVisible = false;\n          }\n\n          timelinePanel.style.display = 'none';\n          heatmapPanel.classList.add('visible');\n          renderHeatmap();\n        }\n      }\n\n      function renderHeatmap() {\n        const ctx = heatmapCanvas.getContext('2d');\n        const containerWidth = heatmapPanel.clientWidth;\n        const height = heatmapPanel.clientHeight;\n        const scrollLeft = document.getElementById('heatmapScroll').scrollLeft;\n\n        // Calculate total virtual width\n        const totalWidth = containerWidth * heatmapZoom;\n\n        // Update Spacer\n        document.getElementById('heatmapSpacer').style.width = totalWidth + 'px';\n\n        const dpr = window.devicePixelRatio || 1;\n\n        // Canvas is always viewport size\n        heatmapCanvas.width = containerWidth * dpr;\n        heatmapCanvas.height = height * dpr;\n        ctx.scale(dpr, dpr);\n\n        ctx.fillStyle = '#0d1117';\n        ctx.fillRect(0, 0, containerWidth, height);\n\n        if (filteredEvents.length === 0) return;\n\n        const remotes = {};\n        filteredEvents.forEach(evt => {\n          if (!remotes[evt.name]) remotes[evt.name] = [];\n          remotes[evt.name].push(evt);\n        });\n\n        const sortedRemotes = Object.keys(remotes).sort((a, b) => remotes[b].length - remotes[a].length);\n\n        const margin = { top: 30, right: 20, bottom: 20, left: 150 };\n\n        // Virtual chart width\n        const chartWidth = totalWidth - margin.left - margin.right;\n        const chartHeight = height - margin.top - margin.bottom;\n\n        // Apply Zoom to time bins\n        const timeBins = Math.floor(100 * heatmapZoom);\n        const binWidth = chartWidth / timeBins;\n        const binDuration = totalDuration / timeBins;\n\n        // Adjust row height to fit\n        const rowHeight = Math.min(30, chartHeight / sortedRemotes.length);\n\n        // Store data for tooltip (adjusted for virtual scroll)\n        window.lastHeatmapData = { sortedRemotes, rowHeight, binWidth, remotes, timeBins, binDuration, margin, scrollLeft };\n\n        ctx.strokeStyle = '#30363d';\n        ctx.lineWidth = 1;\n\n        ctx.font = '11px -apple-system, BlinkMacSystemFont, \"Segoe UI\", Helvetica, Arial, sans-serif';\n        ctx.textAlign = 'right';\n        ctx.textBaseline = 'middle';\n\n        let maxBinCount = 0;\n        sortedRemotes.forEach(remote => {\n          const bins = new Array(timeBins).fill(0);\n          remotes[remote].forEach(evt => {\n            const binIndex = Math.min(Math.floor(evt.relTime / binDuration), timeBins - 1);\n            bins[binIndex]++;\n          });\n          maxBinCount = Math.max(maxBinCount, ...bins);\n        });\n\n        // Update Legend Labels\n        window.lastHeatmapData.maxBinCount = maxBinCount;\n        window.lastHeatmapData.maxBinCount = maxBinCount;\n\n        sortedRemotes.forEach((remote, i) => {\n          const y = margin.top + (i * rowHeight);\n\n          // Draw Label (Fixed position)\n          ctx.fillStyle = '#8b949e';\n          ctx.fillText(remote.length > 20 ? remote.slice(0, 18) + '...' : remote, margin.left - 10, y + rowHeight / 2);\n\n          // Draw Line\n          ctx.beginPath();\n          ctx.moveTo(margin.left, y);\n          ctx.lineTo(containerWidth - margin.right, y);\n          ctx.stroke();\n\n          const bins = new Array(timeBins).fill(0);\n          remotes[remote].forEach(evt => {\n            const binIndex = Math.min(Math.floor(evt.relTime / binDuration), timeBins - 1);\n            bins[binIndex]++;\n          });\n\n          bins.forEach((count, binIndex) => {\n            if (count === 0) return;\n\n            // Calculate virtual X\n            const virtualX = margin.left + (binIndex * binWidth);\n\n            // Apply scroll offset\n            const screenX = virtualX - scrollLeft;\n\n            // Only draw if visible\n            if (screenX + binWidth < margin.left || screenX > containerWidth - margin.right) return;\n\n            // Clamp to chart area\n            const drawX = Math.max(margin.left, screenX);\n            const drawWidth = Math.min(binWidth, (containerWidth - margin.right) - drawX);\n\n            const intensity = count / maxBinCount;\n            const hue = (1 - intensity) * 240;\n            ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.8)`;\n\n            ctx.fillRect(drawX, y + 2, drawWidth - 1, rowHeight - 4);\n          });\n        });\n\n        ctx.fillStyle = '#8b949e';\n        ctx.textAlign = 'center';\n        ctx.textBaseline = 'top';\n\n        const numTicks = 5 * Math.ceil(heatmapZoom);\n\n        for (let i = 0; i <= numTicks; i++) {\n          const virtualX = margin.left + (chartWidth * (i / numTicks));\n          const screenX = virtualX - scrollLeft;\n\n          if (screenX < margin.left || screenX > containerWidth - margin.right) continue;\n\n          const time = (totalDuration * (i / numTicks)).toFixed(1) + 's';\n          ctx.fillText(time, screenX, margin.top - 20);\n\n          ctx.beginPath();\n          ctx.moveTo(screenX, margin.top);\n          ctx.lineTo(screenX, height - margin.bottom);\n          ctx.stroke();\n        }\n      }\n\n      // Resize observer for heatmap\n      new ResizeObserver(() => {\n        if (currentView === 'heatmap' && heatmapPanel.classList.contains('visible')) {\n          renderHeatmap();\n        }\n      }).observe(heatmapPanel);\n\n      // Window resize handler for timeline\n      window.addEventListener('resize', () => {\n        if (currentView === 'timeline') {\n          renderVirtualRows(true);\n          renderRuler();\n        }\n      });\n\n      // Virtual Scroll Config\n      const ROW_HEIGHT = 29; // 28px + 1px border\n      const BUFFER_SIZE = 5;\n\n      function formatTime(seconds) {\n        if (seconds < 1) return (seconds * 1000).toFixed(1) + 'ms';\n        return seconds.toFixed(2) + 's';\n      }\n\n      function formatAbsTime(timestamp) {\n        const date = new Date(timestamp * 1000);\n        return date.toLocaleTimeString();\n      }\n\n      function getIconUrl(className) {\n        return `https://robloxapi.github.io/ref/icons/dark/${className}.png`;\n      }\n\n      function escapeHtml(text) {\n        if (!text) return '';\n        return text\n          .replace(/&/g, \"&amp;\")\n          .replace(/</g, \"&lt;\")\n          .replace(/>/g, \"&gt;\")\n          .replace(/\"/g, \"&quot;\")\n          .replace(/'/g, \"&#039;\");\n      }\n\n      function syntaxHighlight(text) {\n        if (!text) return '';\n\n        text = escapeHtml(text);\n        return text\n          .replace(/&quot;((?:[^&]|&(?!(quot;)))*)&quot;/g, '<span class=\"hl-str\">\"$1\"</span>')\n          .replace(/\\b(\\d+(\\.\\d+)?)\\b/g, '<span class=\"hl-num\">$1</span>')\n          .replace(/\\b(true|false)\\b/g, '<span class=\"hl-bool\">$1</span>')\n          .replace(/\\b(nil)\\b/g, '<span class=\"hl-nil\">$1</span>');\n      }\n\n      // Toast Logic\n      function showToast(message) {\n        const toast = document.getElementById('toast');\n        const msgSpan = document.getElementById('toastMessage');\n        msgSpan.innerText = message;\n        toast.classList.add('visible');\n        setTimeout(() => {\n          toast.classList.remove('visible');\n        }, 2000);\n      }\n\n      function copyText(text, message = \"Copied to clipboard\") {\n        navigator.clipboard.writeText(text).then(() => {\n          showToast(message);\n        });\n      }\n\n      function copyArgs(btn) {\n        if (selectedEvent) {\n          navigator.clipboard.writeText(selectedEvent.args).then(() => {\n            btn.classList.add('copied');\n            setTimeout(() => btn.classList.remove('copied'), 2000);\n          });\n        }\n      }\n\n      function toggleCallerDropdown(e) {\n        e.stopPropagation();\n        const menu = document.getElementById('callerDropdown');\n        if (menu) {\n          menu.classList.toggle('visible');\n        }\n      }\n\n      function copyCallerData(type) {\n        if (!selectedEvent) return;\n        let text = \"\";\n        let msg = \"Copied to clipboard\";\n        switch (type) {\n          case 'hash':\n            text = selectedEvent.funcHash || \"N/A\";\n            msg = \"Function Hash copied\";\n            break;\n          case 'upvalues':\n            text = selectedEvent.upvalues || \"{}\";\n            msg = \"Upvalues copied\";\n            break;\n          case 'protos':\n            text = selectedEvent.protos || \"[]\";\n            msg = \"Protos copied\";\n            break;\n          case 'path':\n            text = selectedEvent.origin || \"N/A\";\n            msg = \"Script Path copied\";\n            break;\n          case 'source':\n            text = selectedEvent.funcSource || \"N/A\";\n            msg = \"Source copied\";\n            break;\n        }\n        copyText(text, msg);\n        document.getElementById('callerDropdown').classList.remove('visible');\n      }\n\n      // Render Ruler\n      function renderRuler() {\n        rulerContainer.innerHTML = '';\n        const tickCount = Math.max(5, Math.floor(5 * zoomLevel));\n        for (let i = 0; i <= tickCount; i++) {\n          const pct = (i / tickCount) * 100;\n          const time = (totalDuration * (i / tickCount));\n          const tick = document.createElement('div');\n          tick.className = 'tick';\n          tick.style.left = pct + '%';\n          tick.innerText = formatTime(time);\n          rulerContainer.appendChild(tick);\n        }\n      }\n\n      // Scroll Sync\n      rowsContainer.addEventListener('scroll', () => {\n        timelineHeader.scrollLeft = rowsContainer.scrollLeft;\n      });\n\n      // Virtual Rendering\n      function renderVirtualRows(force = false) {\n        const scrollTop = rowsContainer.scrollTop;\n        const containerHeight = rowsContainer.clientHeight;\n\n        const totalHeight = filteredEvents.length * ROW_HEIGHT;\n        virtualSpacer.style.height = totalHeight + 'px';\n\n        const startIndex = Math.floor(scrollTop / ROW_HEIGHT);\n        const endIndex = Math.min(filteredEvents.length, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + BUFFER_SIZE);\n\n        if (!force && startIndex === lastStartIndex && endIndex === lastEndIndex) {\n          return;\n        }\n\n        lastStartIndex = startIndex;\n        lastEndIndex = endIndex;\n\n        const visibleEvents = filteredEvents.slice(Math.max(0, startIndex - BUFFER_SIZE), endIndex);\n        const startOffset = Math.max(0, startIndex - BUFFER_SIZE) * ROW_HEIGHT;\n\n        virtualContent.style.transform = `translateY(${startOffset}px)`;\n\n        const fragment = document.createDocumentFragment();\n        const zoomWidth = (100 * zoomLevel) + '%';\n\n        // Sync Ruler Width\n        document.getElementById('ruler').style.width = zoomWidth;\n\n        visibleEvents.forEach((evt) => {\n          const row = document.createElement('div');\n          row.className = 'trace-row';\n          if (selectedEvent === evt) row.classList.add('selected');\n\n          row.evtData = evt;\n          row.onclick = function () { selectRow(this, evt); };\n\n          const listCol = document.createElement('div');\n          listCol.className = 'row-list';\n          listCol.innerHTML = `\n                    <div class=\"type-icon\" style=\"background-image: url('${getIconUrl(evt.className)}')\"></div>\n                    <div class=\"remote-name\" title=\"${evt.name}\">${evt.name}</div>\n                `;\n\n          const timelineCol = document.createElement('div');\n          timelineCol.className = 'row-timeline';\n          timelineCol.style.width = zoomWidth;\n          timelineCol.style.flex = 'none';\n\n          const marker = document.createElement('div');\n          marker.className = `timeline-marker ${evt.typeClass}`;\n\n          let leftPct = ((evt.relTime) / totalDuration) * 100;\n          if (leftPct > 99) leftPct = 99;\n\n          let widthPct = (0.05 / totalDuration) * 100;\n          if (widthPct < 1) widthPct = 1;\n\n          marker.style.left = leftPct + '%';\n          marker.style.width = widthPct + '%';\n\n          timelineCol.appendChild(marker);\n          row.appendChild(listCol);\n          row.appendChild(timelineCol);\n          fragment.appendChild(row);\n        });\n\n        virtualContent.innerHTML = '';\n        virtualContent.appendChild(fragment);\n      }\n\n      // Ctrl+F Handler\n      document.addEventListener('keydown', function (e) {\n        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {\n          e.preventDefault();\n          const filterInput = document.getElementById('filterInput');\n          filterInput.focus();\n          filterInput.select();\n        }\n      });\n\n      // Initial Render\n      renderVirtualRows();\n      renderRuler();\n\n      function selectRow(el, evt) {\n        const prev = virtualContent.querySelector('.trace-row.selected');\n        if (prev) prev.classList.remove('selected');\n\n        el.classList.add('selected');\n        selectedEvent = evt;\n\n        detailsPanel.classList.add('visible');\n\n        const isIncoming = evt.typeClass === 'incoming';\n        const badgeClass = isIncoming ? 'incoming' : 'outgoing';\n\n        // Flags with Unified Style\n        let flagsHtml = '';\n        if (evt.isExecutor) {\n          flagsHtml += `<div class=\"badge-pill executor\">Executor</div>`;\n        }\n        if (evt.isActor) {\n          flagsHtml += `<div class=\"badge-pill actor\">Actor</div>`;\n        }\n        if (evt.isBlocked) {\n          flagsHtml += `<div class=\"badge-pill blocked\">Blocked</div>`;\n        }\n        if (!flagsHtml) flagsHtml = '<span style=\"color:var(--text-secondary); font-size:11px;\">None</span>';\n\n        const highlightedArgs = syntaxHighlight(evt.args);\n\n        // Icons\n        const copyIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-copy icon-copy\"><rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/></svg>`;\n        const checkIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-check icon-check\"><path d=\"M20 6 9 17l-5-5\"/></svg>`;\n        const parenthesesIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-parentheses\"><path d=\"M8 21s-4-3-4-9 4-9 4-9\"/><path d=\"M16 3s4 3 4 9-4 9-4 9\"/></svg>`;\n\n        // Dropdown Icons\n        const hashIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-hash\"><line x1=\"4\" x2=\"20\" y1=\"9\" y2=\"9\"/><line x1=\"4\" x2=\"20\" y1=\"15\" y2=\"15\"/><line x1=\"10\" x2=\"8\" y1=\"3\" y2=\"21\"/><line x1=\"16\" x2=\"14\" y1=\"3\" y2=\"21\"/></svg>`;\n        const upvaluesIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-a-arrow-up\"><path d=\"m14 11 4-4 4 4\"/><path d=\"M18 16V7\"/><path d=\"m2 16 4.039-9.69a.5.5 0 0 1 .923 0L11 16\"/><path d=\"M3.304 13h6.392\"/></svg>`;\n        const protosIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-square-function\"><rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\"/><path d=\"M9 17c2 0 2.8-1 2.8-2.8V10c0-2 1-3.3 3.2-3\"/><path d=\"M9 11.2h5.7\"/></svg>`;\n        const pathIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-route\"><circle cx=\"6\" cy=\"19\" r=\"3\"/><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\"/><circle cx=\"18\" cy=\"5\" r=\"3\"/></svg>`;\n        const sourceIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-code\"><path d=\"m16 18 6-6-6-6\"/><path d=\"m8 6-6 6 6 6\"/></svg>`;\n        const boxIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-box\"><path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\"/><path d=\"m3.3 7 8.7 5 8.7-5\"/><path d=\"M12 22v-9\"/></svg>`;\n\n        detailsContent.innerHTML = `\n                <div class=\"details-header-top\">\n                    <div class=\"details-title-group\">\n                        <div class=\"details-icon-large\" style=\"background-image: url('${getIconUrl(evt.className)}')\"></div>\n                        <div class=\"details-name-large\">${escapeHtml(evt.name)}</div>\n                    </div>\n                    <div class=\"details-actions\">\n                        <div class=\"badge-pill ${badgeClass}\">${evt.typeClass.toUpperCase()}</div>\n                        <div class=\"close-btn\" onclick=\"closeDetails()\">\195\151</div>\n                    </div>\n                </div>\n\n                <div class=\"details-path-row\" onclick=\"copyText('${escapeHtml(evt.path).replace(/'/g, \"\\\\'\").replace(/\"/g, \"&quot;\")}', 'Remote Path copied')\" title=\"Click to copy path\"><span class=\"clickable-path\">${escapeHtml(evt.path)}</span></div>\n\n                <div class=\"info-grid\">\n                    <div class=\"info-item\">\n                        <h4>Method</h4>\n                        <div>${escapeHtml(evt.method)}</div>\n                    </div>\n                    <div class=\"info-item\">\n                        <h4>Timestamp</h4>\n                        <div>${formatAbsTime(evt.timestamp)} <span style=\"color:var(--text-secondary)\">(+${formatTime(evt.relTime)})</span></div>\n                    </div>\n                    <div class=\"info-item\">\n                        <h4>ClassName</h4>\n                        <div>${escapeHtml(evt.className)}</div>\n                    </div>\n                    <div class=\"info-item\">\n                        <h4>Remote Path</h4>\n                        <div class=\"remote-path-copy clickable-path\" onclick=\"copyText('${escapeHtml(evt.path).replace(/'/g, \"\\\\'\").replace(/\"/g, \"&quot;\")}', 'Remote Path copied')\" title=\"Click to copy path\">${escapeHtml(evt.path)}</div>\n                    </div>\n                </div>\n\n                <div class=\"content-box\">\n                    <div class=\"box-title\">Caller Data</div>\n                    <button class=\"copy-icon-btn\" onclick=\"toggleCallerDropdown(event)\" title=\"Copy Caller Info\">${copyIcon}</button>\n\n                    <div id=\"callerDropdown\" class=\"dropdown-menu\">\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('hash')\">${hashIcon} Function Hash</div>\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('upvalues')\">${upvaluesIcon} Upvalues</div>\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('protos')\">${protosIcon} Protos</div>\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('constants')\">${boxIcon} Constants</div>\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('path')\">${pathIcon} Script Path</div>\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('source')\">${sourceIcon} Func Source</div>\n                    </div>\n\n                    <div class=\"caller-header\">\n                        <div class=\"caller-icon\">${parenthesesIcon}</div>\n                        <div class=\"caller-info\">\n                            <div class=\"caller-name\">${escapeHtml(evt.funcName)} <span class=\"caller-source\">:${evt.funcLine}</span></div>\n                            <div class=\"caller-source\">${escapeHtml(evt.funcSource)}</div>\n                        </div>\n                    </div>\n\n                    <div class=\"info-grid-2\" style=\"margin-bottom:0; gap:10px;\">\n                         <div class=\"info-item-2\" style=\"margin-right: 100px;\">\n                            <h4>Flags</h4>\n                            <div class=\"flags-row\">${flagsHtml}</div>\n                         </div>\n                         <div class=\"info-item-2\">\n                            <h4>Origin</h4>\n                            <div class=\"origin-row clickable-path\" onclick=\"copyText('${escapeHtml(evt.origin).replace(/'/g, \"\\\\'\").replace(/\"/g, \"&quot;\")}', 'Origin copied')\" title=\"Click to copy origin\">${escapeHtml(evt.origin)}</div>\n                         </div>\n                    </div>\n                </div>\n\n                <div class=\"content-box\">\n                    <div class=\"box-title\">Arguments</div>\n                    <button class=\"copy-icon-btn\" onclick=\"copyArgs(this)\" title=\"Copy Arguments\">\n                        ${copyIcon}\n                        ${checkIcon}\n                    </button>\n                    <div class=\"args-content\">${highlightedArgs}</div>\n                </div>\n            `;\n      }\n\n      function closeDetails() {\n        detailsPanel.classList.remove('visible');\n        const prev = virtualContent.querySelector('.trace-row.selected');\n        if (prev) prev.classList.remove('selected');\n        selectedEvent = null;\n      }\n\n      function handleFilterInput() {\n        if (filterTimeout) clearTimeout(filterTimeout);\n        filterTimeout = setTimeout(applyFilters, 300);\n      }\n\n      function toggleSearchOptions() {\n        const widget = document.getElementById('searchChevron').closest('.search-widget');\n        const options = document.getElementById('searchOptions');\n        const chevron = document.getElementById('searchChevron');\n\n        options.classList.toggle('visible');\n        chevron.classList.toggle('expanded');\n        widget.classList.toggle('expanded');\n      }\n\n      function handleTimeInput() {\n        const minVal = parseFloat(document.getElementById('minTimeInput').value);\n        const maxVal = parseFloat(document.getElementById('maxTimeInput').value);\n        const unit = parseFloat(document.getElementById('timeUnitSelect').value);\n\n        filterMinTime = isNaN(minVal) ? 0 : minVal * unit;\n        filterMaxTime = isNaN(maxVal) ? totalDuration : maxVal * unit;\n\n        if (filterTimeout) clearTimeout(filterTimeout);\n        filterTimeout = setTimeout(applyFilters, 300);\n      }\n\n      function applyFilters() {\n        const query = document.getElementById('filterInput').value.toLowerCase();\n        const checkIncoming = document.getElementById('filterIncoming').checked;\n        const checkOutgoing = document.getElementById('filterOutgoing').checked;\n        const checkActor = document.getElementById('filterActor').checked;\n        const checkNonActor = document.getElementById('filterNonActor').checked;\n        const checkArgs = document.getElementById('filterArgs').checked;\n        const checkProto = document.getElementById('filterProto').checked;\n        const checkConst = document.getElementById('filterConst').checked;\n        const checkHash = document.getElementById('filterHash').checked;\n        const checkSource = document.getElementById('filterSource').checked;\n\n        filteredEvents = allEvents.filter(evt => {\n          // Filter by Type (Incoming/Outgoing)\n          if (checkIncoming || checkOutgoing) {\n            const isIncoming = evt.typeClass === 'incoming';\n            const isOutgoing = evt.typeClass === 'outgoing';\n            if (!((checkIncoming && isIncoming) || (checkOutgoing && isOutgoing))) {\n              return false;\n            }\n          }\n\n          // Filter by Actor Status\n          if (checkActor || checkNonActor) {\n            const isActor = evt.isActor;\n            const isNonActor = !evt.isActor;\n            if (!((checkActor && isActor) || (checkNonActor && isNonActor))) {\n              return false;\n            }\n          }\n\n          let matchesText = !query;\n\n          if (!matchesText) {\n            // Default search: Name and Type\n            if (evt.name.toLowerCase().includes(query) || evt.type.toLowerCase().includes(query)) {\n              matchesText = true;\n            }\n            // Advanced search options\n            else {\n              if (checkArgs && evt.args && evt.args.toLowerCase().includes(query)) matchesText = true;\n              else if (checkProto && evt.protos && evt.protos.toLowerCase().includes(query)) matchesText = true;\n              else if (checkConst && evt.constants && evt.constants.toLowerCase().includes(query)) matchesText = true;\n              else if (checkHash && evt.funcHash && evt.funcHash.toLowerCase().includes(query)) matchesText = true;\n              else if (checkSource && evt.funcSource && evt.funcSource.toLowerCase().includes(query)) matchesText = true;\n            }\n          }\n\n          const matchesTime = evt.relTime >= filterMinTime && evt.relTime <= filterMaxTime;\n\n          return matchesText && matchesTime;\n        });\n\n        // Update Stats\n        statsLabel.innerText = `${filteredEvents.length} Events \226\128\162 ${totalDuration.toFixed(2)}s`;\n\n        // Reset Scroll\n        rowsContainer.scrollTop = 0;\n        lastStartIndex = -1;\n        lastEndIndex = -1;\n\n        if (currentView === 'timeline') {\n          renderVirtualRows(true);\n        } else {\n          renderHeatmap();\n        }\n      } function updateZoom() {\n        const width = (100 * zoomLevel) + '%';\n        rulerContainer.style.width = width;\n        renderRuler();\n        lastStartIndex = -1;\n        renderVirtualRows(true);\n      }\n\n      rowsContainer.addEventListener('wheel', (e) => {\n        if (e.ctrlKey) {\n          e.preventDefault();\n          if (e.deltaY < 0) {\n            zoomLevel = Math.min(zoomLevel * 1.1, 20);\n          } else {\n            zoomLevel = Math.max(zoomLevel / 1.1, 1);\n          }\n          updateZoom();\n        }\n      });\n\n      rowsContainer.addEventListener('scroll', () => {\n        timelineHeader.scrollLeft = rowsContainer.scrollLeft;\n\n        if (!isScrolling) {\n          window.requestAnimationFrame(() => {\n            renderVirtualRows();\n            isScrolling = false;\n          });\n          isScrolling = true;\n        }\n      });\n\n      const sessionInfo = document.querySelector('.session-info');\n      const tooltip = document.querySelector('.session-tooltip');\n\n      sessionInfo.addEventListener('click', (e) => {\n        e.stopPropagation();\n        tooltip.classList.toggle('visible');\n      });\n\n      tooltip.addEventListener('click', (e) => {\n        e.stopPropagation();\n      });\n\n      document.addEventListener('click', () => {\n        tooltip.classList.remove('visible');\n        const dropdown = document.getElementById('callerDropdown');\n        if (dropdown) dropdown.classList.remove('visible');\n      });\n    </script>\n  </body>\n</html>\n"
                                         }
                                     },
                                     {
@@ -24630,41 +24889,26 @@ local ObjectTree = {
                                         }
                                     },
                                     {
+                                        40,
+                                        2,
+                                        {
+                                            "Hook"
+                                        }
+                                    },
+                                    {
                                         39,
                                         2,
                                         {
                                             "Call"
                                         }
-                                    },
-                                    {
-                                        42,
-                                        5,
-                                        {
-                                            "SessionHTMLView",
-                                            Value = "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>RobloxPL - Session Viewer</title>\n    <link\n      rel=\"icon\"\n      type=\"image/png\"\n      href=\"https://RobloxPL-xil.pages.dev/Assets/Logo.png\"\n    />\n    <style>\n      :root {\n        --bg-color: #0b0b0b;\n        --surface-color: #161b22;\n        --border-color: #30363d;\n        --text-primary: #c9d1d9;\n        --text-secondary: #8b949e;\n        --accent-blue: #58a6ff;\n        --accent-green: #3fb950;\n        --accent-orange: #d29922;\n        --accent-red: #ff7b72;\n        --font-family: \"Inter\", -apple-system, BlinkMacSystemFont, \"Segoe UI\",\n          Helvetica, Arial, sans-serif;\n      }\n\n      body {\n        background-color: var(--bg-color);\n        color: var(--text-primary);\n        font-family: var(--font-family);\n        margin: 0;\n        padding: 0;\n        font-size: 13px;\n        height: 100vh;\n        display: flex;\n        flex-direction: column;\n        overflow: hidden;\n      }\n\n      /* Top Header */\n      .app-header {\n        height: 50px;\n        border-bottom: 1px solid var(--border-color);\n        display: flex;\n        align-items: center;\n        justify-content: space-between;\n        padding: 0 20px;\n        background-color: var(--bg-color);\n        flex-shrink: 0;\n        z-index: 10;\n      }\n\n      .brand {\n        display: flex;\n        align-items: center;\n        gap: 10px;\n        font-size: 16px;\n        font-weight: 600;\n        color: #fff;\n      }\n\n      .brand-icon {\n        width: 20px;\n        height: 20px;\n        background-image: url(\"https://RobloxPL-xil.pages.dev/Assets/Logo.png\");\n        background-size: contain;\n        background-repeat: no-repeat;\n        background-position: center;\n      }\n\n      .session-container {\n        position: relative;\n        display: flex;\n        flex-direction: column;\n        align-items: flex-end;\n      }\n\n      .session-info {\n        color: var(--text-secondary);\n        font-family: monospace;\n        font-size: 12px;\n        cursor: pointer;\n        padding: 2px 5px;\n        border-radius: 4px;\n        transition: background-color 0.2s ease;\n        user-select: none;\n      }\n\n      .session-info:hover {\n        background-color: #1c2128;\n      }\n\n      .session-id {\n        color: #fff;\n      }\n\n      .session-tooltip {\n        position: absolute;\n        top: 100%;\n        right: 0;\n        background-color: #1c2128;\n        border: 1px solid var(--border-color);\n        border-radius: 6px;\n        padding: 10px;\n        z-index: 100;\n        width: 250px;\n        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n        margin-top: 5px;\n        opacity: 0;\n        transform: translateY(-10px);\n        pointer-events: none;\n        visibility: hidden;\n        transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;\n      }\n\n      .session-tooltip::before {\n        content: \"\";\n        position: absolute;\n        top: -10px;\n        left: 0;\n        width: 100%;\n        height: 10px;\n        background: transparent;\n      }\n\n      .session-container:hover .session-tooltip,\n      .session-tooltip.visible {\n        opacity: 1;\n        transform: translateY(0);\n        pointer-events: auto;\n        visibility: visible;\n      }\n\n      .tooltip-row {\n        display: flex;\n        justify-content: space-between;\n        margin-bottom: 5px;\n        font-size: 11px;\n      }\n\n      .tooltip-label {\n        color: var(--text-secondary);\n      }\n\n      .tooltip-value {\n        color: var(--text-primary);\n        font-family: monospace;\n        user-select: text;\n      }\n\n      /* Mobile Responsiveness */\n      @media (max-width: 768px) {\n        .app-header {\n          height: auto;\n          flex-wrap: wrap;\n          padding: 10px;\n          gap: 10px;\n        }\n\n        .brand {\n          font-size: 14px;\n        }\n\n        .session-container {\n          align-items: flex-start;\n          display: none;\n          /* Hide session info on mobile to save space */\n        }\n\n        .trace-toolbar {\n          height: auto;\n          flex-wrap: wrap;\n          padding: 10px;\n          gap: 10px;\n          justify-content: space-between;\n        }\n\n        /* Hide non-essential info on mobile */\n        .trace-toolbar > div:first-child,\n        #statsLabel {\n          display: none;\n        }\n\n        .search-widget {\n          width: 100%;\n          order: 3;\n          margin-top: 5px;\n        }\n\n        .view-toggle {\n          width: 100%;\n          display: flex;\n        }\n\n        .view-btn {\n          flex: 1;\n          text-align: center;\n        }\n\n        .row-list {\n          width: 60vw;\n          /* Use viewport width to prevent runaway expansion */\n        }\n\n        .col-list {\n          width: 60vw;\n          flex: none;\n        }\n\n        .details-panel.visible {\n          position: fixed;\n          top: 0;\n          left: 0;\n          width: 100%;\n          height: 100%;\n          z-index: 1000;\n          border-left: none;\n        }\n\n        .details-header-top {\n          margin-top: 10px;\n        }\n\n        /* Fix Details Header Overflow */\n        .details-title-group {\n          min-width: 0;\n          flex: 1;\n          margin-right: 10px;\n        }\n\n        .details-name-large {\n          white-space: nowrap;\n          overflow: hidden;\n          text-overflow: ellipsis;\n        }\n\n        .details-actions {\n          flex-shrink: 0;\n        }\n\n        /* Allow wrapping for paths on mobile */\n        .details-path-row,\n        .origin-row,\n        .remote-path-copy {\n          white-space: normal !important;\n          word-break: break-all;\n        }\n      }\n\n      /* Scrollbars */\n      ::-webkit-scrollbar {\n        width: 10px;\n        height: 10px;\n      }\n\n      ::-webkit-scrollbar-track {\n        background: #0d1117;\n      }\n\n      ::-webkit-scrollbar-thumb {\n        background: #30363d;\n        border-radius: 5px;\n        border: 2px solid #0d1117;\n      }\n\n      ::-webkit-scrollbar-thumb:hover {\n        background: #8b949e;\n      }\n\n      ::-webkit-scrollbar-corner {\n        background: var(--bg-color);\n      }\n\n      /* Heatmap Styles */\n      .heatmap-container {\n        flex: 1;\n        display: none;\n        flex-direction: column;\n        overflow: hidden;\n        background-color: var(--bg-color);\n        position: relative;\n      }\n\n      .heatmap-container.visible {\n        display: flex;\n      }\n\n      .heatmap-canvas {\n        flex: 1;\n        width: 100%;\n        height: 100%;\n      }\n\n      .view-toggle {\n        display: flex;\n        background: #1c2128;\n        border: 1px solid var(--border-color);\n        border-radius: 4px;\n        overflow: hidden;\n      }\n\n      .view-btn {\n        padding: 4px 12px;\n        font-size: 12px;\n        cursor: pointer;\n        color: var(--text-secondary);\n        background: transparent;\n        border: none;\n        transition: all 0.2s;\n      }\n\n      .view-btn.active {\n        background: var(--accent-blue);\n        color: white;\n      }\n\n      .view-btn:hover:not(.active) {\n        background: #30363d;\n      }\n\n      /* Main Layout */\n      .main-container {\n        display: flex;\n        flex: 1;\n        overflow: hidden;\n      }\n\n      /* Left Panel: Trace View */\n      .trace-panel {\n        flex: 1;\n        display: flex;\n        flex-direction: column;\n        border-right: 1px solid var(--border-color);\n        min-width: 0;\n        overflow: hidden;\n      }\n\n      .trace-toolbar {\n        height: 40px;\n        border-bottom: 1px solid var(--border-color);\n        display: flex;\n        align-items: center;\n        padding: 0 10px;\n        gap: 10px;\n        background-color: var(--bg-color);\n        flex-shrink: 0;\n      }\n\n      .search-widget {\n        display: flex;\n        flex-direction: column;\n        background-color: var(--bg-color);\n        border: 1px solid var(--border-color);\n        border-radius: 6px;\n        width: 320px;\n        position: relative;\n        transition: border-color 0.2s ease, border-radius 0.2s ease;\n        box-sizing: border-box;\n      }\n\n      .search-widget:focus-within {\n        border-color: var(--accent-blue);\n      }\n\n      .search-widget:focus-within > .search-options {\n        border-color: var(--accent-blue);\n      }\n\n      .search-widget.expanded {\n        border-bottom-left-radius: 0;\n        border-bottom-right-radius: 0;\n        border-bottom-color: transparent;\n      }\n\n      .search-row {\n        display: flex;\n        align-items: center;\n        padding: 4px;\n      }\n\n      .search-chevron {\n        cursor: pointer;\n        padding: 2px;\n        color: var(--text-secondary);\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        transition: transform 0.2s ease, color 0.2s ease;\n        width: 20px;\n        height: 20px;\n        border-radius: 4px;\n      }\n\n      .search-chevron:hover {\n        background-color: rgba(255, 255, 255, 0.1);\n        color: var(--text-primary);\n      }\n\n      .search-chevron.expanded {\n        transform: rotate(90deg);\n      }\n\n      .search-input-container {\n        flex: 1;\n        display: flex;\n        align-items: center;\n        margin-left: 4px;\n      }\n\n      .search-input {\n        background: transparent;\n        border: none;\n        color: var(--text-primary);\n        font-size: 12px;\n        width: 100%;\n        outline: none;\n        height: 20px;\n      }\n\n      .search-options {\n        transition: border-color 0.2s ease, border-radius 0.2s ease;\n        display: none;\n        padding: 10px;\n        border: 1px solid var(--border-color);\n        border-top: none;\n        background-color: var(--bg-color);\n        flex-direction: column;\n        gap: 12px;\n        position: absolute;\n        top: 100%;\n        left: -1px;\n        right: -1px;\n        z-index: 100;\n        border-bottom-left-radius: 6px;\n        border-bottom-right-radius: 6px;\n        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);\n        box-sizing: border-box;\n      }\n\n      .search-options.visible {\n        display: flex;\n      }\n\n      .time-range-row {\n        display: flex;\n        align-items: center;\n        gap: 8px;\n        font-size: 11px;\n        color: var(--text-secondary);\n      }\n\n      .filter-options-row {\n        display: flex;\n        flex-wrap: wrap;\n        gap: 8px;\n        padding-top: 8px;\n        border-top: 1px solid var(--border-color);\n      }\n\n      .filter-checkbox-label {\n        display: flex;\n        align-items: center;\n        gap: 4px;\n        font-size: 11px;\n        color: var(--text-secondary);\n        cursor: pointer;\n        user-select: none;\n      }\n\n      .filter-checkbox-label:hover {\n        color: var(--text-primary);\n      }\n\n      .filter-checkbox {\n        accent-color: var(--accent-blue);\n      }\n\n      .time-input-styled {\n        background-color: #161b22;\n        border: 1px solid var(--border-color);\n        color: var(--text-primary);\n        border-radius: 4px;\n        padding: 4px 8px;\n        width: 60px;\n        outline: none;\n        font-size: 11px;\n        transition: border-color 0.2s ease;\n        margin: 0 2px;\n      }\n\n      .time-input-styled:focus {\n        border-color: var(--accent-blue);\n      }\n\n      .unit-select {\n        background-color: #161b22;\n        border: 1px solid var(--border-color);\n        color: var(--text-primary);\n        border-radius: 4px;\n        outline: none;\n        font-size: 11px;\n        padding: 3px 6px;\n        cursor: pointer;\n        transition: border-color 0.2s ease;\n      }\n\n      .unit-select:focus {\n        border-color: var(--accent-blue);\n      }\n\n      .trace-header-row {\n        display: flex;\n        height: 30px;\n        border-bottom: 1px solid var(--border-color);\n        background-color: var(--surface-color);\n        font-size: 11px;\n        color: var(--text-secondary);\n        line-height: 30px;\n        flex-shrink: 0;\n      }\n\n      .col-list {\n        width: 300px;\n        padding-left: 15px;\n        border-right: 1px solid var(--border-color);\n        flex-shrink: 0;\n        z-index: 5;\n        background-color: var(--surface-color);\n        box-sizing: border-box;\n        /* Match row-list */\n      }\n\n      .col-timeline {\n        flex: 1;\n        position: relative;\n        overflow: hidden;\n        min-width: calc(100vw - 300px);\n      }\n\n      .timeline-ruler {\n        position: relative;\n        top: 0;\n        left: 0;\n        height: 100%;\n        pointer-events: none;\n      }\n\n      .tick {\n        position: absolute;\n        top: 0;\n        bottom: 0;\n        border-left: 1px solid #30363d;\n        font-size: 10px;\n        color: #484f58;\n        padding-left: 4px;\n      }\n\n      .trace-rows {\n        flex: 1;\n        overflow: auto;\n        /* Ensure both scrollbars appear */\n        position: relative;\n        contain: strict;\n      }\n\n      .virtual-spacer {\n        position: absolute;\n        top: 0;\n        left: 0;\n        width: 1px;\n      }\n\n      .virtual-content {\n        position: absolute;\n        top: 0;\n        left: 0;\n        width: 100%;\n      }\n\n      .trace-row {\n        display: flex;\n        height: 28px;\n        /* align-items: center;  Removed to allow children to stretch */\n        cursor: pointer;\n        /* border-bottom: 1px solid #1c2128; Moved to children */\n        width: fit-content;\n        min-width: 100%;\n        transition: background-color 0.1s ease;\n        box-sizing: border-box;\n      }\n\n      .trace-row:hover {\n        background-color: #1c2128;\n      }\n\n      .trace-row.selected {\n        background-color: rgba(88, 166, 255, 0.1);\n      }\n\n      .trace-row.hidden {\n        display: none;\n      }\n\n      .trace-row:hover * {\n        background-color: #1c2128;\n      }\n\n      .trace-row.selected * {\n        background-color: #1c2333;\n      }\n\n      .row-list {\n        width: 300px;\n        padding-left: 15px;\n        /* Use box-shadow for sticky border to prevent it from disappearing */\n        box-shadow: 1px 0 0 0 var(--border-color);\n        border-right: none;\n        border-bottom: 1px solid #1c2128;\n        /* Added border here */\n        display: flex;\n        align-items: center;\n        overflow: hidden;\n        flex-shrink: 0;\n        box-sizing: border-box;\n        position: sticky;\n        left: 0;\n        background-color: var(--bg-color);\n        z-index: 2;\n        transition: background-color 0.1s ease;\n        height: 100%;\n      }\n\n      .row-timeline {\n        flex: 1;\n        position: relative;\n        height: 100%;\n        overflow: hidden;\n        border-bottom: 1px solid #1c2128;\n        /* Added border here */\n        box-sizing: border-box;\n        /* Ensure border is inside height */\n      }\n\n      .type-icon {\n        width: 16px;\n        height: 16px;\n        margin-right: 8px;\n        flex-shrink: 0;\n        background-size: contain;\n        background-repeat: no-repeat;\n        background-position: center;\n      }\n\n      .remote-name {\n        white-space: nowrap;\n        overflow: hidden;\n        text-overflow: ellipsis;\n        color: var(--text-primary);\n        font-size: 12px;\n      }\n\n      .timeline-marker {\n        position: absolute;\n        top: 10px;\n        height: 8px;\n        min-width: 4px;\n        border-radius: 4px;\n        opacity: 0.9;\n      }\n\n      .timeline-marker.incoming {\n        background: linear-gradient(90deg, var(--accent-green), #2ea043);\n      }\n\n      .timeline-marker.outgoing {\n        background: linear-gradient(90deg, var(--accent-orange), #b08800);\n      }\n\n      /* Right Panel: Details */\n      .details-panel {\n        width: 0;\n        opacity: 0;\n        background-color: var(--bg-color);\n        border-left: 0 solid var(--border-color);\n        display: flex;\n        flex-direction: column;\n        padding: 0;\n        box-sizing: border-box;\n        overflow-y: auto;\n        overflow-x: hidden;\n        position: relative;\n        flex-shrink: 0;\n        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease,\n          padding 0.3s ease;\n      }\n\n      .details-panel.visible {\n        width: 450px;\n        opacity: 1;\n        padding: 20px;\n        border-left: 1px solid var(--border-color);\n      }\n\n      /* Header */\n      .details-header-top {\n        display: flex;\n        align-items: center;\n        justify-content: space-between;\n        margin-bottom: 10px;\n      }\n\n      .details-title-group {\n        display: flex;\n        align-items: center;\n        gap: 10px;\n      }\n\n      .details-icon-large {\n        width: 32px;\n        height: 32px;\n        background-size: contain;\n        background-repeat: no-repeat;\n        background-position: center;\n      }\n\n      .details-name-large {\n        font-size: 20px;\n        font-weight: 600;\n        color: #fff;\n      }\n\n      .details-actions {\n        display: flex;\n        align-items: center;\n        gap: 10px;\n      }\n\n      .close-btn {\n        cursor: pointer;\n        color: var(--text-secondary);\n        font-size: 20px;\n        transition: color 0.2s ease;\n        line-height: 1;\n      }\n\n      .close-btn:hover {\n        color: #fff;\n      }\n\n      /* Unified Badge Style */\n      .badge-pill {\n        padding: 4px 12px;\n        border-radius: 20px;\n        font-size: 11px;\n        font-weight: 600;\n        text-transform: uppercase;\n        border: 1px solid;\n        letter-spacing: 0.5px;\n        white-space: nowrap;\n      }\n\n      .badge-pill.incoming {\n        color: var(--accent-green);\n        border-color: var(--accent-green);\n      }\n\n      .badge-pill.outgoing {\n        color: var(--accent-orange);\n        border-color: var(--accent-orange);\n      }\n\n      .badge-pill.executor {\n        color: var(--accent-green);\n        border-color: var(--accent-green);\n      }\n\n      .badge-pill.actor {\n        color: var(--accent-red);\n        border-color: var(--accent-red);\n        background: repeating-linear-gradient(\n          45deg,\n          transparent,\n          transparent 2px,\n          rgba(255, 123, 114, 0.1) 2px,\n          rgba(255, 123, 114, 0.1) 4px\n        );\n      }\n\n      .badge-pill.blocked {\n        color: var(--accent-red);\n        border-color: var(--accent-red);\n      }\n\n      .details-path-row {\n        color: var(--text-secondary);\n        font-size: 12px;\n        margin-bottom: 20px;\n        font-family: monospace;\n        white-space: nowrap;\n        text-overflow: ellipsis;\n        overflow: hidden;\n        height: 1.2em;\n      }\n\n      .remote-path-copy {\n        cursor: pointer;\n        color: var(--text-secondary);\n        font-size: 12px;\n        font-weight: normal;\n        transition: color 0.2s ease;\n        white-space: nowrap;\n        overflow: hidden;\n        text-overflow: ellipsis;\n        display: block;\n        width: 25%;\n      }\n\n      .remote-path-copy:hover {\n        color: var(--accent-blue);\n      }\n\n      /* Info Grid 2 */\n      .info-grid-2 {\n        display: flex;\n        gap: 20px;\n        margin-bottom: 25px;\n      }\n\n      .info-item-2 h4 {\n        margin: 0 0 6px 0;\n        color: var(--text-secondary);\n        font-size: 12px;\n        font-weight: normal;\n      }\n\n      .info-item-2 div {\n        font-size: 11px;\n        color: var(--text-primary);\n        font-family: monospace;\n      }\n\n      /* Info Grid */\n      .info-grid {\n        display: grid;\n        grid-template-columns: 1fr 1fr;\n        gap: 20px;\n        margin-bottom: 25px;\n      }\n\n      .info-item h4 {\n        margin: 0 0 6px 0;\n        color: var(--text-secondary);\n        font-size: 12px;\n        font-weight: normal;\n      }\n\n      .info-item div {\n        font-size: 14px;\n        color: var(--text-primary);\n        font-family: monospace;\n      }\n\n      .clickable-path {\n        border-bottom: 1px dashed var(--text-secondary);\n        cursor: pointer;\n        transition: color 0.2s, border-color 0.2s;\n      }\n\n      .clickable-path:hover {\n        color: var(--accent-blue);\n        border-color: var(--accent-blue);\n      }\n\n      /* Content Boxes */\n      .content-box {\n        border: 1px solid var(--border-color);\n        border-radius: 8px;\n        padding: 15px;\n        margin-bottom: 20px;\n        position: relative;\n        background-color: rgba(22, 27, 34, 0.5);\n      }\n\n      .box-title {\n        position: absolute;\n        top: -10px;\n        left: 10px;\n        background-color: var(--bg-color);\n        padding: 0 5px;\n        font-size: 11px;\n        color: var(--text-secondary);\n      }\n\n      .caller-header {\n        display: flex;\n        align-items: center;\n        gap: 10px;\n        margin-bottom: 15px;\n      }\n\n      .caller-icon {\n        color: var(--text-secondary);\n        display: flex;\n        align-items: center;\n        justify-content: center;\n      }\n\n      .caller-icon svg {\n        width: 24px;\n        height: 24px;\n      }\n\n      .caller-info {\n        flex: 1;\n        min-width: 0;\n        /* Critical for flex child truncation */\n      }\n\n      .caller-name {\n        color: var(--accent-blue);\n        font-family: monospace;\n        font-size: 14px;\n        margin-bottom: 2px;\n      }\n\n      .caller-source {\n        color: var(--text-secondary);\n        font-size: 11px;\n        font-family: monospace;\n        height: 1.2em;\n        white-space: nowrap;\n        overflow: hidden;\n        text-overflow: ellipsis;\n        display: block;\n      }\n\n      .flags-row {\n        display: flex;\n        gap: 10px;\n        margin-bottom: 10px;\n        align-items: center;\n      }\n\n      .origin-row {\n        font-size: 12px;\n        color: var(--text-primary);\n        font-family: monospace;\n        display: block;\n        white-space: nowrap;\n        height: 1.2em;\n        overflow: hidden;\n        text-overflow: ellipsis;\n        width: 35%;\n      }\n\n      /* Arguments */\n      .args-content {\n        font-family: \"Consolas\", \"Monaco\", monospace;\n        font-size: 12px;\n        white-space: pre-wrap;\n        overflow-x: auto;\n        color: #e0e0e0;\n        max-height: 300px;\n        overflow-y: auto;\n        line-height: 1.5;\n      }\n\n      /* Copy Button with Animation */\n      .copy-icon-btn {\n        position: absolute;\n        top: 10px;\n        right: 10px;\n        background: transparent;\n        border: 1px solid var(--border-color);\n        border-radius: 4px;\n        color: var(--text-secondary);\n        cursor: pointer;\n        width: 28px;\n        height: 28px;\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        transition: all 0.2s;\n        overflow: hidden;\n        /* Ensure check icon doesn't spill out */\n      }\n\n      .copy-icon-btn:hover {\n        border-color: var(--text-primary);\n        color: var(--text-primary);\n        background-color: var(--surface-color);\n      }\n\n      .copy-icon-btn svg {\n        width: 14px;\n        height: 14px;\n        position: absolute;\n        top: 50%;\n        left: 50%;\n        transform: translate(-50%, -50%) scale(1);\n        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);\n      }\n\n      .copy-icon-btn .icon-check {\n        transform: translate(-50%, -50%) scale(0);\n        color: var(--accent-green);\n      }\n\n      .copy-icon-btn.copied .icon-copy {\n        transform: translate(-50%, -50%) scale(0);\n      }\n\n      .copy-icon-btn.copied .icon-check {\n        transform: translate(-50%, -50%) scale(1);\n      }\n\n      /* Dropdown */\n      .dropdown-menu {\n        position: absolute;\n        top: 42px;\n        /* Button height + spacing */\n        right: 10px;\n        background-color: #1c2128;\n        border: 1px solid var(--border-color);\n        border-radius: 6px;\n        width: 160px;\n        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n        z-index: 50;\n        display: none;\n        overflow: hidden;\n      }\n\n      .dropdown-menu.visible {\n        display: block;\n      }\n\n      .dropdown-item {\n        padding: 8px 12px;\n        font-size: 12px;\n        color: var(--text-primary);\n        cursor: pointer;\n        transition: background-color 0.2s;\n        display: flex;\n        align-items: center;\n        gap: 8px;\n      }\n\n      .dropdown-item:hover {\n        background-color: var(--accent-blue);\n        color: #fff;\n      }\n\n      .dropdown-item svg {\n        width: 14px;\n        height: 14px;\n        opacity: 0.7;\n      }\n\n      /* Toast Notification */\n      .toast-container {\n        position: fixed;\n        bottom: 30px;\n        left: 50%;\n        transform: translateX(-50%) translateY(20px);\n        background-color: #1c2128;\n        border: 1px solid var(--border-color);\n        border-radius: 6px;\n        padding: 8px 16px;\n        color: #fff;\n        font-size: 12px;\n        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n        opacity: 0;\n        transition: opacity 0.3s, transform 0.3s;\n        pointer-events: none;\n        z-index: 1000;\n        display: flex;\n        align-items: center;\n        gap: 8px;\n      }\n\n      .toast-container.visible {\n        opacity: 1;\n        transform: translateX(-50%) translateY(0);\n      }\n\n      .toast-container svg {\n        width: 16px;\n        height: 16px;\n        color: var(--accent-green);\n      }\n\n      /* Syntax Highlighting */\n      .hl-str {\n        color: #a5d6ff;\n      }\n\n      .hl-num {\n        color: #79c0ff;\n      }\n\n      .hl-bool {\n        color: #ff7b72;\n      }\n\n      .hl-key {\n        color: #7ee787;\n      }\n\n      .hl-nil {\n        color: #ff7b72;\n      }\n\n      .footer {\n        height: 25px;\n        border-top: 1px solid var(--border-color);\n        display: flex;\n        align-items: center;\n        justify-content: space-between;\n        padding: 0 20px;\n        background-color: var(--bg-color);\n        color: var(--text-secondary);\n        font-size: 11px;\n        flex-shrink: 0;\n      }\n    </style>\n  </head>\n\n  <body>\n    <div class=\"app-header\">\n      <a\n        href=\"https://gitlab.com/upio/RobloxPL/-/tree/main\"\n        target=\"_blank\"\n        style=\"text-decoration: none\"\n      >\n        <div class=\"brand\">\n          <div class=\"brand-icon\"></div>\n          RobloxPL - Session Viewer\n        </div>\n      </a>\n      <div class=\"session-container\">\n        <div class=\"session-info\">\n          Session / <span class=\"session-id\">{{SESSION_ID}}</span>\n        </div>\n        <div class=\"session-tooltip\">\n          <div class=\"tooltip-row\">\n            <span class=\"tooltip-label\">Start Time (tick)</span>\n            <span class=\"tooltip-value\">{{START_TIME}}</span>\n          </div>\n          <div class=\"tooltip-row\">\n            <span class=\"tooltip-label\">Place ID</span>\n            <span class=\"tooltip-value\">{{PLACE_ID}}</span>\n          </div>\n          <div class=\"tooltip-row\">\n            <span class=\"tooltip-label\">Job ID</span>\n            <span class=\"tooltip-value\">{{JOB_ID}}</span>\n          </div>\n        </div>\n      </div>\n    </div>\n\n    <div class=\"main-container\">\n      <!-- LEFT PANEL WRAPPER -->\n      <div\n        class=\"left-panel-wrapper\"\n        style=\"\n          flex: 1;\n          display: flex;\n          flex-direction: column;\n          border-right: 1px solid var(--border-color);\n          min-width: 0;\n          overflow: hidden;\n        \"\n      >\n        <!-- SHARED TOOLBAR -->\n        <div class=\"trace-toolbar\">\n          <div\n            style=\"\n              font-size: 11px;\n              color: var(--text-secondary);\n              margin-right: 20px;\n            \"\n          >\n            Started: {{DATE}}\n          </div>\n          <div style=\"flex: 1\"></div>\n          <div class=\"view-toggle\">\n            <button class=\"view-btn active\" onclick=\"switchView('timeline')\">\n              Timeline\n            </button>\n            <button class=\"view-btn\" onclick=\"switchView('heatmap')\">\n              Heatmap\n            </button>\n          </div>\n          <div class=\"divider\"></div>\n          <div class=\"search-widget\">\n            <div class=\"search-row\">\n              <div\n                class=\"search-chevron\"\n                onclick=\"toggleSearchOptions()\"\n                id=\"searchChevron\"\n              >\n                <svg\n                  width=\"16\"\n                  height=\"16\"\n                  viewBox=\"0 0 16 16\"\n                  fill=\"currentColor\"\n                >\n                  <path\n                    d=\"M6 4l4 4-4 4\"\n                    stroke=\"currentColor\"\n                    stroke-width=\"1.5\"\n                    fill=\"none\"\n                  />\n                </svg>\n              </div>\n              <div class=\"search-input-container\">\n                <input\n                  type=\"text\"\n                  class=\"search-input\"\n                  id=\"filterInput\"\n                  placeholder=\"Filter events...\"\n                  oninput=\"handleFilterInput()\"\n                />\n              </div>\n            </div>\n            <div class=\"search-options\" id=\"searchOptions\">\n              <div class=\"time-range-row\">\n                <span>Time Range:</span>\n                <input\n                  type=\"number\"\n                  class=\"time-input-styled\"\n                  id=\"minTimeInput\"\n                  placeholder=\"Start\"\n                  oninput=\"handleTimeInput()\"\n                />\n                <span>-</span>\n                <input\n                  type=\"number\"\n                  class=\"time-input-styled\"\n                  id=\"maxTimeInput\"\n                  placeholder=\"End\"\n                  oninput=\"handleTimeInput()\"\n                />\n                <select\n                  class=\"unit-select\"\n                  id=\"timeUnitSelect\"\n                  onchange=\"handleTimeInput()\"\n                >\n                  <option value=\"1\">s</option>\n                  <option value=\"0.001\">ms</option>\n                </select>\n              </div>\n              <div class=\"filter-options-row\">\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterIncoming\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Incoming</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterOutgoing\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Outgoing</label\n                >\n                <div\n                  style=\"\n                    width: 1px;\n                    height: 14px;\n                    background: var(--border-color);\n                    margin: 0 4px;\n                  \"\n                ></div>\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterActor\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Actor</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterNonActor\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Non-Actor</label\n                >\n                <div\n                  style=\"\n                    width: 1px;\n                    height: 14px;\n                    background: var(--border-color);\n                    margin: 0 4px;\n                  \"\n                ></div>\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterArgs\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Args</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterProto\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Proto</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterConst\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Const</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterHash\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Hash</label\n                >\n                <label class=\"filter-checkbox-label\"\n                  ><input\n                    type=\"checkbox\"\n                    class=\"filter-checkbox\"\n                    id=\"filterSource\"\n                    onchange=\"handleFilterInput()\"\n                  />\n                  Source</label\n                >\n              </div>\n            </div>\n          </div>\n        </div>\n\n        <!-- TIMELINE VIEW -->\n        <div class=\"trace-panel\" id=\"timelinePanel\" style=\"border-right: none\">\n          <div class=\"trace-header-row\">\n            <div class=\"col-list\">Remote</div>\n            <div class=\"col-timeline\" id=\"timelineHeader\">\n              <div class=\"timeline-ruler\" id=\"ruler\"></div>\n            </div>\n          </div>\n\n          <div class=\"trace-rows\" id=\"rowsContainer\">\n            <div id=\"virtualSpacer\" class=\"virtual-spacer\"></div>\n            <div id=\"virtualContent\" class=\"virtual-content\"></div>\n          </div>\n        </div>\n\n        <!-- HEATMAP VIEW -->\n        <div class=\"heatmap-container\" id=\"heatmapPanel\">\n          <div\n            id=\"heatmapScroll\"\n            style=\"\n              width: 100%;\n              height: 100%;\n              overflow-x: auto;\n              overflow-y: hidden;\n              position: relative;\n            \"\n          >\n            <div\n              id=\"heatmapSpacer\"\n              style=\"\n                height: 1px;\n                width: 100%;\n                position: absolute;\n                top: 0;\n                left: 0;\n                pointer-events: none;\n              \"\n            ></div>\n            <canvas\n              id=\"heatmapCanvas\"\n              class=\"heatmap-canvas\"\n              style=\"\n                position: sticky;\n                left: 0;\n                top: 0;\n                width: 100%;\n                height: 100%;\n              \"\n            ></canvas>\n          </div>\n          <div\n            id=\"heatmapTooltip\"\n            class=\"heatmap-tooltip\"\n            style=\"\n              display: none;\n              position: absolute;\n              background: #1c2128;\n              border: 1px solid #30363d;\n              padding: 4px 8px;\n              border-radius: 4px;\n              font-size: 11px;\n              color: #c9d1d9;\n              pointer-events: none;\n              z-index: 100;\n            \"\n          ></div>\n        </div>\n      </div>\n\n      <!-- RIGHT PANEL -->\n      <div class=\"details-panel\" id=\"detailsPanel\">\n        <div id=\"detailsContent\"></div>\n      </div>\n    </div>\n\n    <div class=\"footer\">\n      <div>Ended: {{END_DATE}}</div>\n      <span\n        id=\"statsLabel\"\n        style=\"\n          color: var(--text-secondary);\n          font-size: 11px;\n          margin-right: 10px;\n        \"\n      >\n        {{EVENT_COUNT}} Events \226\128\162 {{TOTAL_DURATION}}s\n      </span>\n    </div>\n\n    <!-- Toast Notification -->\n    <div id=\"toast\" class=\"toast-container\">\n      <svg\n        xmlns=\"http://www.w3.org/2000/svg\"\n        width=\"24\"\n        height=\"24\"\n        viewBox=\"0 0 24 24\"\n        fill=\"none\"\n        stroke=\"currentColor\"\n        stroke-width=\"2\"\n        stroke-linecap=\"round\"\n        stroke-linejoin=\"round\"\n        class=\"lucide lucide-check\"\n      >\n        <path d=\"M20 6 9 17l-5-5\" />\n      </svg>\n      <span id=\"toastMessage\">Copied to clipboard</span>\n    </div>\n\n    <!-- Data Script -->\n    <script type=\"application/json\" id=\"dictionary-data\">\n      {{DICTIONARY_JSON}}\n    </script>\n    <script type=\"application/json\" id=\"event-data\">\n      {{EVENTS_JSON}}\n    </script>\n\n    <script>\n      // Data Parsing\n      let startTime = {{START_TIME}}; // Seconds\n      const totalDuration = {{DURATION}};\n      const dictionary = JSON.parse(document.getElementById('dictionary-data').textContent);\n      const rawEvents = JSON.parse(document.getElementById('event-data').textContent);\n\n      // Reconstruct Events\n      const allEvents = rawEvents.map(e => ({\n        name: dictionary[e[0]],\n        className: dictionary[e[1]],\n        path: dictionary[e[2]],\n        type: dictionary[e[3]],\n        timestamp: e[4],\n        origin: dictionary[e[5]],\n\n        args: dictionary[e[6]],\n        method: dictionary[e[7]],\n\n        funcName: dictionary[e[8]],\n        funcLine: e[9],\n        funcSource: dictionary[e[10]],\n        isExecutor: e[11] === 1,\n        isActor: e[12] === 1,\n\n        funcHash: dictionary[e[13]],\n        upvalues: dictionary[e[14]],\n        protos: dictionary[e[15]],\n        constants: dictionary[e[16]],\n        isBlocked: e[17] === 1\n      }));\n\n      if (allEvents.length > 0) {\n        const minTimestamp = Math.min(...allEvents.map(e => e.timestamp));\n        if (minTimestamp < startTime) {\n          startTime = minTimestamp;\n        }\n      }\n\n      // Preprocess events\n      allEvents.forEach(evt => {\n        evt.relTime = Math.max(0, evt.timestamp - startTime);\n\n        const typeLower = evt.type.toLowerCase();\n        const methodLower = evt.method ? evt.method.toLowerCase() : '';\n\n        if (methodLower.includes('client') || typeLower.includes('client')) {\n          evt.typeClass = 'incoming';\n        } else {\n          evt.typeClass = 'outgoing';\n        }\n      });\n\n      // State\n      let filteredEvents = allEvents;\n      let zoomLevel = 1;\n      let selectedEvent = null;\n      let filterTimeout = null;\n      let filterMinTime = 0;\n      let filterMaxTime = totalDuration;\n\n      // Initialize Time Inputs\n      document.getElementById('minTimeInput').value = \"0\";\n      document.getElementById('maxTimeInput').value = totalDuration.toFixed(2);\n\n      // Virtual Scroll State\n      let lastStartIndex = -1;\n      let lastEndIndex = -1;\n      let isScrolling = false;\n\n      // DOM Elements\n      const rowsContainer = document.getElementById('rowsContainer');\n      const virtualSpacer = document.getElementById('virtualSpacer');\n      const virtualContent = document.getElementById('virtualContent');\n      const rulerContainer = document.getElementById('ruler');\n      const detailsPanel = document.getElementById('detailsPanel');\n      const detailsContent = document.getElementById('detailsContent');\n      const timelineHeader = document.getElementById('timelineHeader');\n      const statsLabel = document.getElementById('statsLabel');\n\n\n      // Heatmap State\n      let currentView = 'timeline';\n      let heatmapZoom = 1;\n      let detailsWasVisible = false;\n      const heatmapCanvas = document.getElementById('heatmapCanvas');\n      const heatmapTooltip = document.getElementById('heatmapTooltip');\n\n      const timelinePanel = document.getElementById('timelinePanel');\n      const heatmapPanel = document.getElementById('heatmapPanel');\n\n      // Heatmap Interaction\n      heatmapCanvas.addEventListener('wheel', (e) => {\n        if (currentView !== 'heatmap') return;\n        e.preventDefault();\n\n        const delta = e.deltaY > 0 ? 1.1 : 0.9;\n        heatmapZoom = Math.max(1, Math.min(50, heatmapZoom * delta));\n        renderHeatmap();\n      }, { passive: false });\n\n      heatmapCanvas.addEventListener('mousemove', (e) => {\n        if (currentView !== 'heatmap') return;\n        const rect = heatmapCanvas.getBoundingClientRect();\n        const x = e.clientX - rect.left;\n        const y = e.clientY - rect.top;\n\n        if (!window.lastHeatmapData) return;\n\n        const { sortedRemotes, rowHeight, binWidth, remotes, maxBinCount, timeBins, binDuration, margin, scrollLeft } = window.lastHeatmapData;\n        const width = heatmapPanel.clientWidth;\n        const height = heatmapPanel.clientHeight;\n\n        if (x < margin.left || x > width - margin.right || y < margin.top || y > height - margin.bottom) {\n          heatmapTooltip.style.display = 'none';\n          return;\n        }\n\n        const rowIndex = Math.floor((y - margin.top) / rowHeight);\n\n        // Calculate colIndex based on virtual position (x + scrollLeft)\n        const colIndex = Math.floor((x - margin.left + scrollLeft) / binWidth);\n\n        if (rowIndex >= 0 && rowIndex < sortedRemotes.length && colIndex >= 0 && colIndex < timeBins) {\n          const remote = sortedRemotes[rowIndex];\n          // Calculate count for this bin\n          let count = 0;\n          remotes[remote].forEach(evt => {\n            const binIndex = Math.min(Math.floor(evt.relTime / binDuration), timeBins - 1);\n            if (binIndex === colIndex) count++;\n          });\n\n          heatmapTooltip.style.display = 'block';\n          heatmapTooltip.innerHTML = `<b>${remote}</b><br>Time: ${(colIndex * binDuration).toFixed(1)}s<br>Count: ${count}`;\n\n          const tooltipWidth = heatmapTooltip.offsetWidth;\n          const panelWidth = heatmapPanel.clientWidth;\n\n          let leftPos = x + 10;\n          if (leftPos + tooltipWidth > panelWidth - 10) {\n            leftPos = x - tooltipWidth - 10;\n          }\n\n          heatmapTooltip.style.left = leftPos + 'px';\n          heatmapTooltip.style.top = (y + 10) + 'px';\n        } else {\n          heatmapTooltip.style.display = 'none';\n        }\n      });\n\n      heatmapCanvas.addEventListener('mouseleave', () => {\n        heatmapTooltip.style.display = 'none';\n      });\n\n      document.getElementById('heatmapScroll').addEventListener('scroll', () => {\n        if (currentView === 'heatmap') {\n          renderHeatmap();\n        }\n      });\n\n      function switchView(view) {\n        currentView = view;\n        document.querySelectorAll('.view-btn').forEach(btn => {\n          btn.classList.toggle('active', btn.innerText.toLowerCase() === view);\n        });\n\n        if (view === 'timeline') {\n          timelinePanel.style.display = 'flex';\n          heatmapPanel.classList.remove('visible');\n\n          if (detailsWasVisible) {\n            detailsPanel.classList.add('visible');\n          }\n\n          renderVirtualRows(true);\n        } else {\n          if (detailsPanel.classList.contains('visible')) {\n            detailsWasVisible = true;\n            detailsPanel.classList.remove('visible');\n          } else {\n            detailsWasVisible = false;\n          }\n\n          timelinePanel.style.display = 'none';\n          heatmapPanel.classList.add('visible');\n          renderHeatmap();\n        }\n      }\n\n      function renderHeatmap() {\n        const ctx = heatmapCanvas.getContext('2d');\n        const containerWidth = heatmapPanel.clientWidth;\n        const height = heatmapPanel.clientHeight;\n        const scrollLeft = document.getElementById('heatmapScroll').scrollLeft;\n\n        // Calculate total virtual width\n        const totalWidth = containerWidth * heatmapZoom;\n\n        // Update Spacer\n        document.getElementById('heatmapSpacer').style.width = totalWidth + 'px';\n\n        const dpr = window.devicePixelRatio || 1;\n\n        // Canvas is always viewport size\n        heatmapCanvas.width = containerWidth * dpr;\n        heatmapCanvas.height = height * dpr;\n        ctx.scale(dpr, dpr);\n\n        ctx.fillStyle = '#0d1117';\n        ctx.fillRect(0, 0, containerWidth, height);\n\n        if (filteredEvents.length === 0) return;\n\n        const remotes = {};\n        filteredEvents.forEach(evt => {\n          if (!remotes[evt.name]) remotes[evt.name] = [];\n          remotes[evt.name].push(evt);\n        });\n\n        const sortedRemotes = Object.keys(remotes).sort((a, b) => remotes[b].length - remotes[a].length);\n\n        const margin = { top: 30, right: 20, bottom: 20, left: 150 };\n\n        // Virtual chart width\n        const chartWidth = totalWidth - margin.left - margin.right;\n        const chartHeight = height - margin.top - margin.bottom;\n\n        // Apply Zoom to time bins\n        const timeBins = Math.floor(100 * heatmapZoom);\n        const binWidth = chartWidth / timeBins;\n        const binDuration = totalDuration / timeBins;\n\n        // Adjust row height to fit\n        const rowHeight = Math.min(30, chartHeight / sortedRemotes.length);\n\n        // Store data for tooltip (adjusted for virtual scroll)\n        window.lastHeatmapData = { sortedRemotes, rowHeight, binWidth, remotes, timeBins, binDuration, margin, scrollLeft };\n\n        ctx.strokeStyle = '#30363d';\n        ctx.lineWidth = 1;\n\n        ctx.font = '11px -apple-system, BlinkMacSystemFont, \"Segoe UI\", Helvetica, Arial, sans-serif';\n        ctx.textAlign = 'right';\n        ctx.textBaseline = 'middle';\n\n        let maxBinCount = 0;\n        sortedRemotes.forEach(remote => {\n          const bins = new Array(timeBins).fill(0);\n          remotes[remote].forEach(evt => {\n            const binIndex = Math.min(Math.floor(evt.relTime / binDuration), timeBins - 1);\n            bins[binIndex]++;\n          });\n          maxBinCount = Math.max(maxBinCount, ...bins);\n        });\n\n        // Update Legend Labels\n        window.lastHeatmapData.maxBinCount = maxBinCount;\n        window.lastHeatmapData.maxBinCount = maxBinCount;\n\n        sortedRemotes.forEach((remote, i) => {\n          const y = margin.top + (i * rowHeight);\n\n          // Draw Label (Fixed position)\n          ctx.fillStyle = '#8b949e';\n          ctx.fillText(remote.length > 20 ? remote.slice(0, 18) + '...' : remote, margin.left - 10, y + rowHeight / 2);\n\n          // Draw Line\n          ctx.beginPath();\n          ctx.moveTo(margin.left, y);\n          ctx.lineTo(containerWidth - margin.right, y);\n          ctx.stroke();\n\n          const bins = new Array(timeBins).fill(0);\n          remotes[remote].forEach(evt => {\n            const binIndex = Math.min(Math.floor(evt.relTime / binDuration), timeBins - 1);\n            bins[binIndex]++;\n          });\n\n          bins.forEach((count, binIndex) => {\n            if (count === 0) return;\n\n            // Calculate virtual X\n            const virtualX = margin.left + (binIndex * binWidth);\n\n            // Apply scroll offset\n            const screenX = virtualX - scrollLeft;\n\n            // Only draw if visible\n            if (screenX + binWidth < margin.left || screenX > containerWidth - margin.right) return;\n\n            // Clamp to chart area\n            const drawX = Math.max(margin.left, screenX);\n            const drawWidth = Math.min(binWidth, (containerWidth - margin.right) - drawX);\n\n            const intensity = count / maxBinCount;\n            const hue = (1 - intensity) * 240;\n            ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.8)`;\n\n            ctx.fillRect(drawX, y + 2, drawWidth - 1, rowHeight - 4);\n          });\n        });\n\n        ctx.fillStyle = '#8b949e';\n        ctx.textAlign = 'center';\n        ctx.textBaseline = 'top';\n\n        const numTicks = 5 * Math.ceil(heatmapZoom);\n\n        for (let i = 0; i <= numTicks; i++) {\n          const virtualX = margin.left + (chartWidth * (i / numTicks));\n          const screenX = virtualX - scrollLeft;\n\n          if (screenX < margin.left || screenX > containerWidth - margin.right) continue;\n\n          const time = (totalDuration * (i / numTicks)).toFixed(1) + 's';\n          ctx.fillText(time, screenX, margin.top - 20);\n\n          ctx.beginPath();\n          ctx.moveTo(screenX, margin.top);\n          ctx.lineTo(screenX, height - margin.bottom);\n          ctx.stroke();\n        }\n      }\n\n      // Resize observer for heatmap\n      new ResizeObserver(() => {\n        if (currentView === 'heatmap' && heatmapPanel.classList.contains('visible')) {\n          renderHeatmap();\n        }\n      }).observe(heatmapPanel);\n\n      // Window resize handler for timeline\n      window.addEventListener('resize', () => {\n        if (currentView === 'timeline') {\n          renderVirtualRows(true);\n          renderRuler();\n        }\n      });\n\n      // Virtual Scroll Config\n      const ROW_HEIGHT = 29; // 28px + 1px border\n      const BUFFER_SIZE = 5;\n\n      function formatTime(seconds) {\n        if (seconds < 1) return (seconds * 1000).toFixed(1) + 'ms';\n        return seconds.toFixed(2) + 's';\n      }\n\n      function formatAbsTime(timestamp) {\n        const date = new Date(timestamp * 1000);\n        return date.toLocaleTimeString();\n      }\n\n      function getIconUrl(className) {\n        return `https://robloxapi.github.io/ref/icons/dark/${className}.png`;\n      }\n\n      function escapeHtml(text) {\n        if (!text) return '';\n        return text\n          .replace(/&/g, \"&amp;\")\n          .replace(/</g, \"&lt;\")\n          .replace(/>/g, \"&gt;\")\n          .replace(/\"/g, \"&quot;\")\n          .replace(/'/g, \"&#039;\");\n      }\n\n      function syntaxHighlight(text) {\n        if (!text) return '';\n\n        text = escapeHtml(text);\n        return text\n          .replace(/&quot;((?:[^&]|&(?!(quot;)))*)&quot;/g, '<span class=\"hl-str\">\"$1\"</span>')\n          .replace(/\\b(\\d+(\\.\\d+)?)\\b/g, '<span class=\"hl-num\">$1</span>')\n          .replace(/\\b(true|false)\\b/g, '<span class=\"hl-bool\">$1</span>')\n          .replace(/\\b(nil)\\b/g, '<span class=\"hl-nil\">$1</span>');\n      }\n\n      // Toast Logic\n      function showToast(message) {\n        const toast = document.getElementById('toast');\n        const msgSpan = document.getElementById('toastMessage');\n        msgSpan.innerText = message;\n        toast.classList.add('visible');\n        setTimeout(() => {\n          toast.classList.remove('visible');\n        }, 2000);\n      }\n\n      function copyText(text, message = \"Copied to clipboard\") {\n        navigator.clipboard.writeText(text).then(() => {\n          showToast(message);\n        });\n      }\n\n      function copyArgs(btn) {\n        if (selectedEvent) {\n          navigator.clipboard.writeText(selectedEvent.args).then(() => {\n            btn.classList.add('copied');\n            setTimeout(() => btn.classList.remove('copied'), 2000);\n          });\n        }\n      }\n\n      function toggleCallerDropdown(e) {\n        e.stopPropagation();\n        const menu = document.getElementById('callerDropdown');\n        if (menu) {\n          menu.classList.toggle('visible');\n        }\n      }\n\n      function copyCallerData(type) {\n        if (!selectedEvent) return;\n        let text = \"\";\n        let msg = \"Copied to clipboard\";\n        switch (type) {\n          case 'hash':\n            text = selectedEvent.funcHash || \"N/A\";\n            msg = \"Function Hash copied\";\n            break;\n          case 'upvalues':\n            text = selectedEvent.upvalues || \"{}\";\n            msg = \"Upvalues copied\";\n            break;\n          case 'protos':\n            text = selectedEvent.protos || \"[]\";\n            msg = \"Protos copied\";\n            break;\n          case 'path':\n            text = selectedEvent.origin || \"N/A\";\n            msg = \"Script Path copied\";\n            break;\n          case 'source':\n            text = selectedEvent.funcSource || \"N/A\";\n            msg = \"Source copied\";\n            break;\n        }\n        copyText(text, msg);\n        document.getElementById('callerDropdown').classList.remove('visible');\n      }\n\n      // Render Ruler\n      function renderRuler() {\n        rulerContainer.innerHTML = '';\n        const tickCount = Math.max(5, Math.floor(5 * zoomLevel));\n        for (let i = 0; i <= tickCount; i++) {\n          const pct = (i / tickCount) * 100;\n          const time = (totalDuration * (i / tickCount));\n          const tick = document.createElement('div');\n          tick.className = 'tick';\n          tick.style.left = pct + '%';\n          tick.innerText = formatTime(time);\n          rulerContainer.appendChild(tick);\n        }\n      }\n\n      // Scroll Sync\n      rowsContainer.addEventListener('scroll', () => {\n        timelineHeader.scrollLeft = rowsContainer.scrollLeft;\n      });\n\n      // Virtual Rendering\n      function renderVirtualRows(force = false) {\n        const scrollTop = rowsContainer.scrollTop;\n        const containerHeight = rowsContainer.clientHeight;\n\n        const totalHeight = filteredEvents.length * ROW_HEIGHT;\n        virtualSpacer.style.height = totalHeight + 'px';\n\n        const startIndex = Math.floor(scrollTop / ROW_HEIGHT);\n        const endIndex = Math.min(filteredEvents.length, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + BUFFER_SIZE);\n\n        if (!force && startIndex === lastStartIndex && endIndex === lastEndIndex) {\n          return;\n        }\n\n        lastStartIndex = startIndex;\n        lastEndIndex = endIndex;\n\n        const visibleEvents = filteredEvents.slice(Math.max(0, startIndex - BUFFER_SIZE), endIndex);\n        const startOffset = Math.max(0, startIndex - BUFFER_SIZE) * ROW_HEIGHT;\n\n        virtualContent.style.transform = `translateY(${startOffset}px)`;\n\n        const fragment = document.createDocumentFragment();\n        const zoomWidth = (100 * zoomLevel) + '%';\n\n        // Sync Ruler Width\n        document.getElementById('ruler').style.width = zoomWidth;\n\n        visibleEvents.forEach((evt) => {\n          const row = document.createElement('div');\n          row.className = 'trace-row';\n          if (selectedEvent === evt) row.classList.add('selected');\n\n          row.evtData = evt;\n          row.onclick = function () { selectRow(this, evt); };\n\n          const listCol = document.createElement('div');\n          listCol.className = 'row-list';\n          listCol.innerHTML = `\n                    <div class=\"type-icon\" style=\"background-image: url('${getIconUrl(evt.className)}')\"></div>\n                    <div class=\"remote-name\" title=\"${evt.name}\">${evt.name}</div>\n                `;\n\n          const timelineCol = document.createElement('div');\n          timelineCol.className = 'row-timeline';\n          timelineCol.style.width = zoomWidth;\n          timelineCol.style.flex = 'none';\n\n          const marker = document.createElement('div');\n          marker.className = `timeline-marker ${evt.typeClass}`;\n\n          let leftPct = ((evt.relTime) / totalDuration) * 100;\n          if (leftPct > 99) leftPct = 99;\n\n          let widthPct = (0.05 / totalDuration) * 100;\n          if (widthPct < 1) widthPct = 1;\n\n          marker.style.left = leftPct + '%';\n          marker.style.width = widthPct + '%';\n\n          timelineCol.appendChild(marker);\n          row.appendChild(listCol);\n          row.appendChild(timelineCol);\n          fragment.appendChild(row);\n        });\n\n        virtualContent.innerHTML = '';\n        virtualContent.appendChild(fragment);\n      }\n\n      // Ctrl+F Handler\n      document.addEventListener('keydown', function (e) {\n        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {\n          e.preventDefault();\n          const filterInput = document.getElementById('filterInput');\n          filterInput.focus();\n          filterInput.select();\n        }\n      });\n\n      // Initial Render\n      renderVirtualRows();\n      renderRuler();\n\n      function selectRow(el, evt) {\n        const prev = virtualContent.querySelector('.trace-row.selected');\n        if (prev) prev.classList.remove('selected');\n\n        el.classList.add('selected');\n        selectedEvent = evt;\n\n        detailsPanel.classList.add('visible');\n\n        const isIncoming = evt.typeClass === 'incoming';\n        const badgeClass = isIncoming ? 'incoming' : 'outgoing';\n\n        // Flags with Unified Style\n        let flagsHtml = '';\n        if (evt.isExecutor) {\n          flagsHtml += `<div class=\"badge-pill executor\">Executor</div>`;\n        }\n        if (evt.isActor) {\n          flagsHtml += `<div class=\"badge-pill actor\">Actor</div>`;\n        }\n        if (evt.isBlocked) {\n          flagsHtml += `<div class=\"badge-pill blocked\">Blocked</div>`;\n        }\n        if (!flagsHtml) flagsHtml = '<span style=\"color:var(--text-secondary); font-size:11px;\">None</span>';\n\n        const highlightedArgs = syntaxHighlight(evt.args);\n\n        // Icons\n        const copyIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-copy icon-copy\"><rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/></svg>`;\n        const checkIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-check icon-check\"><path d=\"M20 6 9 17l-5-5\"/></svg>`;\n        const parenthesesIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-parentheses\"><path d=\"M8 21s-4-3-4-9 4-9 4-9\"/><path d=\"M16 3s4 3 4 9-4 9-4 9\"/></svg>`;\n\n        // Dropdown Icons\n        const hashIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-hash\"><line x1=\"4\" x2=\"20\" y1=\"9\" y2=\"9\"/><line x1=\"4\" x2=\"20\" y1=\"15\" y2=\"15\"/><line x1=\"10\" x2=\"8\" y1=\"3\" y2=\"21\"/><line x1=\"16\" x2=\"14\" y1=\"3\" y2=\"21\"/></svg>`;\n        const upvaluesIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-a-arrow-up\"><path d=\"m14 11 4-4 4 4\"/><path d=\"M18 16V7\"/><path d=\"m2 16 4.039-9.69a.5.5 0 0 1 .923 0L11 16\"/><path d=\"M3.304 13h6.392\"/></svg>`;\n        const protosIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-square-function\"><rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\"/><path d=\"M9 17c2 0 2.8-1 2.8-2.8V10c0-2 1-3.3 3.2-3\"/><path d=\"M9 11.2h5.7\"/></svg>`;\n        const pathIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-route\"><circle cx=\"6\" cy=\"19\" r=\"3\"/><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\"/><circle cx=\"18\" cy=\"5\" r=\"3\"/></svg>`;\n        const sourceIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-code\"><path d=\"m16 18 6-6-6-6\"/><path d=\"m8 6-6 6 6 6\"/></svg>`;\n        const boxIcon = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-box\"><path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\"/><path d=\"m3.3 7 8.7 5 8.7-5\"/><path d=\"M12 22v-9\"/></svg>`;\n\n        detailsContent.innerHTML = `\n                <div class=\"details-header-top\">\n                    <div class=\"details-title-group\">\n                        <div class=\"details-icon-large\" style=\"background-image: url('${getIconUrl(evt.className)}')\"></div>\n                        <div class=\"details-name-large\">${escapeHtml(evt.name)}</div>\n                    </div>\n                    <div class=\"details-actions\">\n                        <div class=\"badge-pill ${badgeClass}\">${evt.typeClass.toUpperCase()}</div>\n                        <div class=\"close-btn\" onclick=\"closeDetails()\">\195\151</div>\n                    </div>\n                </div>\n\n                <div class=\"details-path-row\" onclick=\"copyText('${escapeHtml(evt.path).replace(/'/g, \"\\\\'\").replace(/\"/g, \"&quot;\")}', 'Remote Path copied')\" title=\"Click to copy path\"><span class=\"clickable-path\">${escapeHtml(evt.path)}</span></div>\n\n                <div class=\"info-grid\">\n                    <div class=\"info-item\">\n                        <h4>Method</h4>\n                        <div>${escapeHtml(evt.method)}</div>\n                    </div>\n                    <div class=\"info-item\">\n                        <h4>Timestamp</h4>\n                        <div>${formatAbsTime(evt.timestamp)} <span style=\"color:var(--text-secondary)\">(+${formatTime(evt.relTime)})</span></div>\n                    </div>\n                    <div class=\"info-item\">\n                        <h4>ClassName</h4>\n                        <div>${escapeHtml(evt.className)}</div>\n                    </div>\n                    <div class=\"info-item\">\n                        <h4>Remote Path</h4>\n                        <div class=\"remote-path-copy clickable-path\" onclick=\"copyText('${escapeHtml(evt.path).replace(/'/g, \"\\\\'\").replace(/\"/g, \"&quot;\")}', 'Remote Path copied')\" title=\"Click to copy path\">${escapeHtml(evt.path)}</div>\n                    </div>\n                </div>\n\n                <div class=\"content-box\">\n                    <div class=\"box-title\">Caller Data</div>\n                    <button class=\"copy-icon-btn\" onclick=\"toggleCallerDropdown(event)\" title=\"Copy Caller Info\">${copyIcon}</button>\n\n                    <div id=\"callerDropdown\" class=\"dropdown-menu\">\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('hash')\">${hashIcon} Function Hash</div>\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('upvalues')\">${upvaluesIcon} Upvalues</div>\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('protos')\">${protosIcon} Protos</div>\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('constants')\">${boxIcon} Constants</div>\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('path')\">${pathIcon} Script Path</div>\n                        <div class=\"dropdown-item\" onclick=\"copyCallerData('source')\">${sourceIcon} Func Source</div>\n                    </div>\n\n                    <div class=\"caller-header\">\n                        <div class=\"caller-icon\">${parenthesesIcon}</div>\n                        <div class=\"caller-info\">\n                            <div class=\"caller-name\">${escapeHtml(evt.funcName)} <span class=\"caller-source\">:${evt.funcLine}</span></div>\n                            <div class=\"caller-source\">${escapeHtml(evt.funcSource)}</div>\n                        </div>\n                    </div>\n\n                    <div class=\"info-grid-2\" style=\"margin-bottom:0; gap:10px;\">\n                         <div class=\"info-item-2\" style=\"margin-right: 100px;\">\n                            <h4>Flags</h4>\n                            <div class=\"flags-row\">${flagsHtml}</div>\n                         </div>\n                         <div class=\"info-item-2\">\n                            <h4>Origin</h4>\n                            <div class=\"origin-row clickable-path\" onclick=\"copyText('${escapeHtml(evt.origin).replace(/'/g, \"\\\\'\").replace(/\"/g, \"&quot;\")}', 'Origin copied')\" title=\"Click to copy origin\">${escapeHtml(evt.origin)}</div>\n                         </div>\n                    </div>\n                </div>\n\n                <div class=\"content-box\">\n                    <div class=\"box-title\">Arguments</div>\n                    <button class=\"copy-icon-btn\" onclick=\"copyArgs(this)\" title=\"Copy Arguments\">\n                        ${copyIcon}\n                        ${checkIcon}\n                    </button>\n                    <div class=\"args-content\">${highlightedArgs}</div>\n                </div>\n            `;\n      }\n\n      function closeDetails() {\n        detailsPanel.classList.remove('visible');\n        const prev = virtualContent.querySelector('.trace-row.selected');\n        if (prev) prev.classList.remove('selected');\n        selectedEvent = null;\n      }\n\n      function handleFilterInput() {\n        if (filterTimeout) clearTimeout(filterTimeout);\n        filterTimeout = setTimeout(applyFilters, 300);\n      }\n\n      function toggleSearchOptions() {\n        const widget = document.getElementById('searchChevron').closest('.search-widget');\n        const options = document.getElementById('searchOptions');\n        const chevron = document.getElementById('searchChevron');\n\n        options.classList.toggle('visible');\n        chevron.classList.toggle('expanded');\n        widget.classList.toggle('expanded');\n      }\n\n      function handleTimeInput() {\n        const minVal = parseFloat(document.getElementById('minTimeInput').value);\n        const maxVal = parseFloat(document.getElementById('maxTimeInput').value);\n        const unit = parseFloat(document.getElementById('timeUnitSelect').value);\n\n        filterMinTime = isNaN(minVal) ? 0 : minVal * unit;\n        filterMaxTime = isNaN(maxVal) ? totalDuration : maxVal * unit;\n\n        if (filterTimeout) clearTimeout(filterTimeout);\n        filterTimeout = setTimeout(applyFilters, 300);\n      }\n\n      function applyFilters() {\n        const query = document.getElementById('filterInput').value.toLowerCase();\n        const checkIncoming = document.getElementById('filterIncoming').checked;\n        const checkOutgoing = document.getElementById('filterOutgoing').checked;\n        const checkActor = document.getElementById('filterActor').checked;\n        const checkNonActor = document.getElementById('filterNonActor').checked;\n        const checkArgs = document.getElementById('filterArgs').checked;\n        const checkProto = document.getElementById('filterProto').checked;\n        const checkConst = document.getElementById('filterConst').checked;\n        const checkHash = document.getElementById('filterHash').checked;\n        const checkSource = document.getElementById('filterSource').checked;\n\n        filteredEvents = allEvents.filter(evt => {\n          // Filter by Type (Incoming/Outgoing)\n          if (checkIncoming || checkOutgoing) {\n            const isIncoming = evt.typeClass === 'incoming';\n            const isOutgoing = evt.typeClass === 'outgoing';\n            if (!((checkIncoming && isIncoming) || (checkOutgoing && isOutgoing))) {\n              return false;\n            }\n          }\n\n          // Filter by Actor Status\n          if (checkActor || checkNonActor) {\n            const isActor = evt.isActor;\n            const isNonActor = !evt.isActor;\n            if (!((checkActor && isActor) || (checkNonActor && isNonActor))) {\n              return false;\n            }\n          }\n\n          let matchesText = !query;\n\n          if (!matchesText) {\n            // Default search: Name and Type\n            if (evt.name.toLowerCase().includes(query) || evt.type.toLowerCase().includes(query)) {\n              matchesText = true;\n            }\n            // Advanced search options\n            else {\n              if (checkArgs && evt.args && evt.args.toLowerCase().includes(query)) matchesText = true;\n              else if (checkProto && evt.protos && evt.protos.toLowerCase().includes(query)) matchesText = true;\n              else if (checkConst && evt.constants && evt.constants.toLowerCase().includes(query)) matchesText = true;\n              else if (checkHash && evt.funcHash && evt.funcHash.toLowerCase().includes(query)) matchesText = true;\n              else if (checkSource && evt.funcSource && evt.funcSource.toLowerCase().includes(query)) matchesText = true;\n            }\n          }\n\n          const matchesTime = evt.relTime >= filterMinTime && evt.relTime <= filterMaxTime;\n\n          return matchesText && matchesTime;\n        });\n\n        // Update Stats\n        statsLabel.innerText = `${filteredEvents.length} Events \226\128\162 ${totalDuration.toFixed(2)}s`;\n\n        // Reset Scroll\n        rowsContainer.scrollTop = 0;\n        lastStartIndex = -1;\n        lastEndIndex = -1;\n\n        if (currentView === 'timeline') {\n          renderVirtualRows(true);\n        } else {\n          renderHeatmap();\n        }\n      } function updateZoom() {\n        const width = (100 * zoomLevel) + '%';\n        rulerContainer.style.width = width;\n        renderRuler();\n        lastStartIndex = -1;\n        renderVirtualRows(true);\n      }\n\n      rowsContainer.addEventListener('wheel', (e) => {\n        if (e.ctrlKey) {\n          e.preventDefault();\n          if (e.deltaY < 0) {\n            zoomLevel = Math.min(zoomLevel * 1.1, 20);\n          } else {\n            zoomLevel = Math.max(zoomLevel / 1.1, 1);\n          }\n          updateZoom();\n        }\n      });\n\n      rowsContainer.addEventListener('scroll', () => {\n        timelineHeader.scrollLeft = rowsContainer.scrollLeft;\n\n        if (!isScrolling) {\n          window.requestAnimationFrame(() => {\n            renderVirtualRows();\n            isScrolling = false;\n          });\n          isScrolling = true;\n        }\n      });\n\n      const sessionInfo = document.querySelector('.session-info');\n      const tooltip = document.querySelector('.session-tooltip');\n\n      sessionInfo.addEventListener('click', (e) => {\n        e.stopPropagation();\n        tooltip.classList.toggle('visible');\n      });\n\n      tooltip.addEventListener('click', (e) => {\n        e.stopPropagation();\n      });\n\n      document.addEventListener('click', () => {\n        tooltip.classList.remove('visible');\n        const dropdown = document.getElementById('callerDropdown');\n        if (dropdown) dropdown.classList.remove('visible');\n      });\n    </script>\n  </body>\n</html>\n"
-                                        }
-                                    },
-                                    {
-                                        38,
-                                        2,
-                                        {
-                                            "Actor"
-                                        }
                                     }
                                 }
                             },
                             {
-                                32,
+                                30,
                                 2,
                                 {
-                                    "Renderer"
-                                }
-                            },
-                            {
-                                29,
-                                2,
-                                {
-                                    "Classifier"
+                                    "Formatter"
                                 }
                             },
                             {
@@ -24672,6 +24916,13 @@ local ObjectTree = {
                                 2,
                                 {
                                     "Types"
+                                }
+                            },
+                            {
+                                32,
+                                2,
+                                {
+                                    "Renderer"
                                 }
                             },
                             {
@@ -24703,7 +24954,65 @@ local ObjectTree = {
                                         }
                                     }
                                 }
+                            },
+                            {
+                                29,
+                                2,
+                                {
+                                    "Classifier"
+                                }
                             }
+                        }
+                    },
+                    {
+                        108,
+                        2,
+                        {
+                            "Ratelimiter"
+                        }
+                    },
+                    {
+                        23,
+                        1,
+                        {
+                            "CallFilter"
+                        },
+                        {
+                            {
+                                24,
+                                2,
+                                {
+                                    "Manager"
+                                }
+                            },
+                            {
+                                25,
+                                2,
+                                {
+                                    "Operators"
+                                }
+                            },
+                            {
+                                26,
+                                2,
+                                {
+                                    "RemoteFields"
+                                }
+                            },
+                            {
+                                27,
+                                2,
+                                {
+                                    "Schema"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        45,
+                        2,
+                        {
+                            "FileHelper"
                         }
                     },
                     {
@@ -24714,10 +25023,33 @@ local ObjectTree = {
                         },
                         {
                             {
-                                102,
-                                2,
+                                97,
+                                1,
                                 {
-                                    "Environment"
+                                    "API"
+                                },
+                                {
+                                    {
+                                        99,
+                                        2,
+                                        {
+                                            "Spy"
+                                        }
+                                    },
+                                    {
+                                        98,
+                                        2,
+                                        {
+                                            "CodeGen"
+                                        }
+                                    },
+                                    {
+                                        100,
+                                        2,
+                                        {
+                                            "UI"
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -24725,6 +25057,34 @@ local ObjectTree = {
                                 2,
                                 {
                                     "Registry"
+                                }
+                            },
+                            {
+                                103,
+                                2,
+                                {
+                                    "Errors"
+                                }
+                            },
+                            {
+                                105,
+                                2,
+                                {
+                                    "Manager"
+                                }
+                            },
+                            {
+                                102,
+                                2,
+                                {
+                                    "Environment"
+                                }
+                            },
+                            {
+                                104,
+                                2,
+                                {
+                                    "Loader"
                                 }
                             },
                             {
@@ -24740,88 +25100,28 @@ local ObjectTree = {
                                 {
                                     "Metadata"
                                 }
-                            },
-                            {
-                                105,
-                                2,
-                                {
-                                    "Manager"
-                                }
-                            },
-                            {
-                                104,
-                                2,
-                                {
-                                    "Loader"
-                                }
-                            },
-                            {
-                                97,
-                                1,
-                                {
-                                    "API"
-                                },
-                                {
-                                    {
-                                        98,
-                                        2,
-                                        {
-                                            "CodeGen"
-                                        }
-                                    },
-                                    {
-                                        100,
-                                        2,
-                                        {
-                                            "UI"
-                                        }
-                                    },
-                                    {
-                                        99,
-                                        2,
-                                        {
-                                            "Spy"
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                103,
-                                2,
-                                {
-                                    "Errors"
-                                }
                             }
                         }
                     },
                     {
-                        44,
+                        114,
                         2,
                         {
-                            "Connect"
+                            "Signal"
                         }
                     },
                     {
-                        110,
+                        93,
                         2,
                         {
-                            "SaveManager"
+                            "Log"
                         }
                     },
                     {
-                        121,
+                        94,
                         2,
                         {
-                            "Validation"
-                        },
-                        {
-                            {
-                                122,
-                                2,
-                                {
-                                    "Schema"
-                                }
-                            }
+                            "LogStore"
                         }
                     },
                     {
@@ -24831,13 +25131,6 @@ local ObjectTree = {
                             "Anticheats"
                         },
                         {
-                            {
-                                20,
-                                2,
-                                {
-                                    "Main"
-                                }
-                            },
                             {
                                 21,
                                 1,
@@ -24853,164 +25146,30 @@ local ObjectTree = {
                                         }
                                     }
                                 }
+                            },
+                            {
+                                20,
+                                2,
+                                {
+                                    "Main"
+                                }
                             }
                         }
                     },
                     {
-                        46,
+                        95,
                         2,
                         {
-                            "FileLog"
-                        }
-                    },
-                    {
-                        45,
-                        2,
-                        {
-                            "FileHelper"
-                        }
-                    },
-                    {
-                        108,
-                        2,
-                        {
-                            "Ratelimiter"
-                        }
-                    },
-                    {
-                        109,
-                        2,
-                        {
-                            "SafePack"
-                        }
-                    },
-                    {
-                        94,
-                        2,
-                        {
-                            "LogStore"
+                            "Pagination"
                         }
                     }
                 }
             },
             {
-                3,
+                2,
                 2,
                 {
-                    "Spy"
-                },
-                {
-                    {
-                        4,
-                        1,
-                        {
-                            "Hooks"
-                        },
-                        {
-                            {
-                                11,
-                                2,
-                                {
-                                    "RakNet"
-                                },
-                                {
-                                    {
-                                        12,
-                                        2,
-                                        {
-                                            "InterceptorUtils"
-                                        }
-                                    },
-                                    {
-                                        13,
-                                        1,
-                                        {
-                                            "Interceptors"
-                                        },
-                                        {
-                                            {
-                                                15,
-                                                2,
-                                                {
-                                                    "Outgoing"
-                                                }
-                                            },
-                                            {
-                                                14,
-                                                2,
-                                                {
-                                                    "Incoming"
-                                                }
-                                            }
-                                        }
-                                    },
-                                    {
-                                        17,
-                                        2,
-                                        {
-                                            "PacketProcessor"
-                                        }
-                                    },
-                                    {
-                                        16,
-                                        2,
-                                        {
-                                            "InvocationTracker"
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                5,
-                                2,
-                                {
-                                    "Luau"
-                                },
-                                {
-                                    {
-                                        8,
-                                        1,
-                                        {
-                                            "Interceptors"
-                                        },
-                                        {
-                                            {
-                                                9,
-                                                2,
-                                                {
-                                                    "Incoming"
-                                                }
-                                            },
-                                            {
-                                                10,
-                                                2,
-                                                {
-                                                    "Outgoing"
-                                                }
-                                            }
-                                        }
-                                    },
-                                    {
-                                        6,
-                                        1,
-                                        {
-                                            "Actors"
-                                        },
-                                        {
-                                            {
-                                                7,
-                                                5,
-                                                {
-                                                    "Environment",
-                                                    Value = "--[[\n\n    Wax Environment replicated for actor env\n\n\tNOTE: the @include regions are autogenerated by the build system, do not modify them in this file.\n\tTo modify the code, modify the source files where the export regions are defined.\n]]\n\nif getgenv().RobloxPLInitialized == true then\n\treturn\nend\n\ngetgenv().RobloxPLInitialized = true\n\ntype ActorData = {\n\tToken: string,\n\tIncomingConnections: boolean,\n\tIncomingCallbacks: boolean,\n\tHookIncomingConnections: boolean,\n\tOutgoing: boolean,\n\n\tIgnorePlayerModule: boolean,\n\tLogBlockedRemotes: boolean,\n\tIgnoredRemotesDropdown: { [string]: boolean },\n\n\tExecutorSupport: { [string]: { IsWorking: boolean } },\n}\n\nlocal Data: ActorData = RobloxPL_ACTOR_DATA\n\nlocal ChannelId, CurrentActor = ...\nif typeof(CurrentActor) == \"Instance\" then\n\tCurrentActor = cloneref(CurrentActor)\nend\n\nlocal function ResolveCurrentActor(Origin)\n\tif Origin and getluastate then\n\t\tlocal Success, LuaStateProxy = pcall(getluastate, Origin)\n\n\t\t-- Best effort to find origin actor\n\t\tif Success then\n\t\t\tlocal Actors = LuaStateProxy:GetActors()\n\t\t\tfor _, Actor in Actors do\n\t\t\t\tif Origin:IsDescendantOf(Actor) then\n\t\t\t\t\treturn cloneref(Actor)\n\t\t\t\tend\n\t\t\tend\n\n\t\t\tif #Actors == 1 then\n\t\t\t\treturn cloneref(Actors[1])\n\t\t\tend\n\t\tend\n\tend\n\n\t-- A LuaState can have several actors assigned to it if the worker limit gets reached\n\t-- Therefore to resolve the actual origin we use get_current_actor\n\tlocal ResolvedActor = get_current_actor and get_current_actor()\n\tif typeof(ResolvedActor) == \"Instance\" then\n\t\treturn cloneref(ResolvedActor)\n\tend\n\n\t-- Probably accurate, but maybe not\n\treturn CurrentActor\nend\n\nlocal RelayChannel = get_comm_channel(ChannelId)\n\nlocal wax = {shared = {}}\nwax.shared.IS_ACTOR = true\nwax.shared.RobloxPLVerificationToken = Data.Token\nlocal OnUnload\ndo\n\twax.shared.Hooks = {}\n\n\twax.shared.Settings = {\n\t\tIgnorePlayerModule = { Value = Data.IgnorePlayerModule },\n\t\tLogBlockedRemotes = { Value = Data.LogBlockedRemotes },\n\t\tIgnoredRemotesDropdown = { Value = Data.IgnoredRemotesDropdown },\n\t\tLogRobloxInternalEvents = { Value = Data.LogRobloxInternalEvents },\n\t}\n\n\twax.shared.SaveManager = {\n\t\tGetState = function(Idx, Default)\n\t\t\treturn (wax.shared.Settings[Idx] and wax.shared.Settings[Idx].Value) or Data[Idx] or Default\n\t\tend,\n\t}\n\n\twax.shared.Log = {}\n\tdo\n\t\twax.shared.Logs = {\n\t\t\tOutgoing = {},\n\t\t\tIncoming = {},\n\t\t}\n\n\t\twax.shared.NewLog = function(Instance, Type, CallingScript, DebugId)\n\t\t\tlocal NewLog = wax.shared.Log.new(Instance, Type, 0, CallingScript)\n\t\t\twax.shared.Logs[Type][DebugId] = NewLog\n\t\t\treturn NewLog\n\t\tend\n\tend\n\n\twax.shared.ExecutorSupport = Data.ExecutorSupport\n\twax.shared.Communicator = RelayChannel\n\twax.shared.ExecutorName = string.split(identifyexecutor(), \" \")[1]\n\n\t--// Services \\\\--\n\tfor _, Service in pairs({\n\t\t\"Players\",\n\t\t\"HttpService\",\n\t\t\"RobloxReplicatedStorage\",\n\t}) do\n\t\twax.shared[Service] = cloneref(game:GetService(Service))\n\tend\n\n\twax.shared.trampoline_call = trampoline_call or (syn and syn.trampoline_call)\n\n\t--// Event Reference \\\\--\n\n\tlocal InstanceSerializer = {}\n\tdo\n\t\t--#region @include region IsEqualToInstance\n\t\t--[[\n\t\t    Checks if two instances are equal.\n\n\t\t    @param Object: The first instance.\n\t\t    @param ToCompareTo: The second instance.\n\t\t    @return Whether the instances are equal.\n\t\t]]\n\t\tlocal function IsEqualToInstance(Object, ToCompareTo)\n\t\t\tif typeof(Object) ~= \"Instance\" or typeof(ToCompareTo) ~= \"Instance\" then return false end\n\n\t\t\tif rawequal(Object, ToCompareTo) then\n\t\t\t\treturn true\n\t\t\tend\n\n\t\t\tif wax.shared.ExecutorSupport[\"compareinstances\"].IsWorking then\n\t\t\t\treturn compareinstances(Object, ToCompareTo)\n\t\t\tend\n\n\t\t\tlocal ObjectDebugId, ToCompareToDebugId, ShouldCompareDebugIds = nil, nil, false\n\t\t\tdo\n\t\t\t\tlocal Success, ObjectDebugIdResult = pcall(wax.shared.GetDebugId, Object)\n\t\t\t\tlocal Success2, ToCompareToDebugIdResult = pcall(wax.shared.GetDebugId, ToCompareTo)\n\n\t\t\t\tif Success and Success2 then\n\t\t\t\t\tObjectDebugId = ObjectDebugIdResult\n\t\t\t\t\tToCompareToDebugId = ToCompareToDebugIdResult\n\t\t\t\t\tShouldCompareDebugIds = true\n\t\t\t\tend\n\t\t\tend\n\n\t\t\tif ShouldCompareDebugIds then\n\t\t\t\treturn ObjectDebugId == ToCompareToDebugId\n\t\t\tend\n\n\t\t\treturn false\n\t\tend\n\t\t--#endregion\n\n\t\tInstanceSerializer.IsEqualToInstance = IsEqualToInstance\n\tend\n\twax.shared.InstanceSerializer = InstanceSerializer\n\n\tlocal Formatter = {}\n\tdo\n\t\t--#region @include region FormatLuaLiteral\n\t\t--// Populate CleanTable \\\\--\n\t\tFormatter.CleanTable = { ['\"'] = '\\\\\"', [\"\\\\\"] = \"\\\\\\\\\" }\n\t\tdo\n\t\t\tfor i = 0, 31 do\n\t\t\t\tFormatter.CleanTable[string.char(i)] = \"\\\\\" .. string.format(\"%03d\", i)\n\t\t\tend\n\t\t\tfor i = 127, 255 do\n\t\t\t\tFormatter.CleanTable[string.char(i)] = \"\\\\\" .. string.format(\"%03d\", i)\n\t\t\tend\n\t\tend\n\n\t\t--// Indent Template \\\\--\n\t\tlocal IndentTemplate = string.rep(\" \", 4)\n\n\t\t--[[\n\t\t    Formats a Lua string to be used in a Lua code block.\n\n\t\t    @param str: The string to format.\n\t\t    @return The formatted string.\n\t\t]]\n\t\tfunction Formatter.FormatLuaString(str)\n\t\t\treturn string.gsub(str, '[\"\\\\\\0-\\31\\127-\\255]', Formatter.CleanTable)\n\t\tend\n\n\t\t--[[\n\t\t    Formats a Lua literal to be used in a Lua code block.\n\n\t\t    @param Value: The value to format.\n\t\t    @return The formatted string.\n\t\t]]\n\t\tfunction Formatter.FormatLuaLiteral(Value): string?\n\t\t\tlocal ValueType = type(Value)\n\t\t\tif ValueType == \"string\" then\n\t\t\t\treturn `\"{Formatter.FormatLuaString(Value)}\"`\n\t\t\telseif ValueType == \"number\" or ValueType == \"boolean\" then\n\t\t\t\treturn tostring(Value)\n\t\t\tend\n\n\t\t\treturn nil\n\t\tend\n\t\t--#endregion\n\tend\n\n\t--#region @include region FindEventReferenceInTable\n\t\t--[[\n\t\t\tFinds an event reference in a table, used to search upvalues which are tables.\n\n\t\t\t@param Table: The table to search.\n\t\t\t@param Instance: The instance to search for.\n\t\t\t@param Visited: The visited table.\n\t\t\t@return The event reference.\n\t\t]]\n\t\tlocal function FindEventReferenceInTable(\n\t\t\tTable: { [any]: any },\n\t\t\tInstance: Instance,\n\t\t\tVisited: { [any]: boolean }?\n\t\t): { any }?\n\t\t\tlocal Seen = Visited or {}\n\t\t\tif Seen[Table] then\n\t\t\t\treturn nil\n\t\t\tend\n\n\t\t\tSeen[Table] = true\n\n\t\t\tfor Key, Value in next, Table do\n\t\t\t\tif\n\t\t\t\t\ttypeof(Value) == \"Instance\"\n\t\t\t\t\tand InstanceSerializer.IsEqualToInstance(Value, Instance)\n\t\t\t\t\tand Formatter.FormatLuaLiteral(Key)\n\t\t\t\tthen\n\t\t\t\t\treturn { Key }\n\t\t\t\tend\n\n\t\t\t\tif type(Value) == \"table\" and Formatter.FormatLuaLiteral(Key) then\n\t\t\t\t\tlocal ChildPath = FindEventReferenceInTable(Value, Instance, Seen)\n\t\t\t\t\tif ChildPath then\n\t\t\t\t\t\ttable.insert(ChildPath, 1, Key)\n\t\t\t\t\t\treturn ChildPath\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\n\t\t\treturn nil\n\t\tend\n\t--#endregion\n\n\t--// Unload \\\\--\n\tlocal RelayConnection\n\tRelayConnection = RelayChannel.Event:Connect(function(Type, ...)\n\t\tif Type == \"Unload\" then\n\t\t\tRelayConnection:Disconnect()\n\t\t\twax.shared.Unloaded = true\n\t\t\tfor _, Connection in wax.shared.Connections do\n\t\t\t\tConnection:Disconnect()\n\t\t\tend\n\t\t\ttable.clear(wax.shared.Connections)\n\n\t\t\tif OnUnload then\n\t\t\t\tOnUnload()\n\t\t\tend\n\t\telseif Type == \"MainBlock\" then\n\t\t\tlocal Instance, EventType = ...\n\t\t\tlocal Log = wax.shared.Logs[EventType][wax.shared.GetDebugId(Instance)]\n\t\t\tif Log then\n\t\t\t\tLog:Block()\n\t\t\tend\n\t\telseif Type == \"MainIgnore\" then\n\t\t\tlocal Instance, EventType = ...\n\t\t\tlocal Log = wax.shared.Logs[EventType][wax.shared.GetDebugId(Instance)]\n\t\t\tif Log then\n\t\t\t\tLog:Ignore()\n\t\t\tend\n\t\telseif Type == \"MainSettingsSync\" then\n\t\t\tlocal Setting, Value = ...\n\t\t\tif wax.shared.Settings[Setting] then\n\t\t\t\twax.shared.Settings[Setting].Value = Value\n\t\t\tend\n\t\telseif Type == \"MainCallFiltersSync\" then\n\t\t\twax.shared.CallFilters:ReplaceAll(..., true)\n\t\telseif Type == \"InspectIncomingConnections\" then\n\t\t\tlocal Instance, Method, LogIndex, CallIndex = ...\n\t\t\tlocal Success, Signal = pcall(function()\n\t\t\t\treturn Instance[Method]\n\t\t\tend)\n\t\t\tif not Success or typeof(Signal) ~= \"RBXScriptSignal\" then\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tfor _, Connection in getconnections(Signal) do\n\t\t\t\tif Connection.ForeignState then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\n\t\t\t\tlocal Function = typeof(Connection.Function) == \"function\" and Connection.Function or nil\n\n\t\t\t\tlocal Origin\n\t\t\t\tlocal Thread = Connection.Thread\n\t\t\t\tif Thread and getscriptfromthread then\n\t\t\t\t\tOrigin = getscriptfromthread(Thread)\n\t\t\t\tend\n\t\t\t\tif not Origin and Function then\n\t\t\t\t\tlocal Script = rawget(getfenv(Function), \"script\")\n\t\t\t\t\tif typeof(Script) == \"Instance\" then\n\t\t\t\t\t\tOrigin = Script\n\t\t\t\t\tend\n\t\t\t\tend\n\n\t\t\t\tlocal FixedInfo, CyclicRefs, ContainsCyclicRef = wax.shared.SerializeActorInfo({\n\t\t\t\t\tOrigin = Origin,\n\t\t\t\t\tFunction = Function,\n\t\t\t\t\tLine = nil,\n\t\t\t\t\tIsExecutor = Function and isexecutorclosure(Function) or false,\n\t\t\t\t\tIsActor = true,\n\t\t\t\t\tActor = ResolveCurrentActor(Origin),\n\t\t\t\t})\n\n\t\t\t\tRelayChannel:Fire(\n\t\t\t\t\t\"IncomingConnectionMetadata\",\n\t\t\t\t\tInstance,\n\t\t\t\t\tLogIndex,\n\t\t\t\t\tCallIndex,\n\t\t\t\t\tFixedInfo,\n\t\t\t\t\tCyclicRefs,\n\t\t\t\t\tContainsCyclicRef\n\t\t\t\t)\n\t\t\tend\n\t\telseif Type == \"ResolveEventReference\" then\n\t\t\tlocal Hash, Instance, IsExecutor, RequestId = ...\n\t\t\tlocal Retrieved = nil\n\n\t\t\tif filtergc then\n\t\t\t\tRetrieved = filtergc(\"function\", {\n\t\t\t\t\tHash = Hash,\n\t\t\t\t\tIgnoreExecutor = not IsExecutor,\n\t\t\t\t}, true)\n\t\t\telse\n\t\t\t\tfor _, Func in getgc() do\n\t\t\t\t\tif typeof(Func) ~= \"function\" then\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tend\n\n\t\t\t\t\tif IsExecutor and not isexecutorclosure(Func) then\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tend\n\n\t\t\t\t\tif getfunctionhash(Func) == Hash then\n\t\t\t\t\t\tRetrieved = Func\n\t\t\t\t\t\tbreak\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\n\t\t\tif not Retrieved then\n\t\t\t\tRelayChannel:Fire(\"ResolveEventReferenceResponse\", RequestId, nil)\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal UpvaluePath = FindEventReferenceInTable(debug.getupvalues(Retrieved), Instance)\n\n\t\t\tif not UpvaluePath then\n\t\t\t\tRelayChannel:Fire(\"ResolveEventReferenceResponse\", RequestId, nil)\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal UpvalueIndex = table.remove(UpvaluePath, 1)\n\t\t\tRelayChannel:Fire(\"ResolveEventReferenceResponse\", RequestId, {\n\t\t\t\tHash = Hash,\n\t\t\t\tIndex = UpvalueIndex,\n\t\t\t\tPath = UpvaluePath,\n\t\t\t})\n\t\tend\n\tend)\n\n\twax.shared.Unloaded = false\nend\n\n--#region @include \"Src/Utils/Connect.luau\" as \"wax.shared.Connect\"\ndo\n\tlocal Connections = {}\n\n\tlocal function Connect(Connection)\n\t\ttable.insert(Connections, Connection)\n\t\treturn Connection\n\tend\n\n\tlocal function Disconnect(Connection)\n\t\tConnection:Disconnect()\n\n\t\tlocal Index = table.find(Connections, Connection)\n\t\tif Index then\n\t\t\ttable.remove(Connections, Index)\n\t\tend\n\n\t\treturn true\n\tend\n\n\twax.shared.Connections = Connections\n\twax.shared.Connect = Connect\n\twax.shared.Disconnect = Disconnect\n\n\twax.shared.Connect = Connect\nend\n--#endregion\n\n--#region @include region PlayerScripts\nwax.shared.LocalPlayer = wax.shared.Players.LocalPlayer\nlocal ContendingPlayerScripts =\n\tcloneref(wax.shared.LocalPlayer:QueryDescendants(\"PlayerScripts\")[1] or wax.shared.LocalPlayer)\nif ContendingPlayerScripts:IsA(\"PlayerScripts\") then\n\twax.shared.PlayerScripts = ContendingPlayerScripts\nelse\n\twax.shared.PlayerScripts = nil\n\n\tlocal ChildAddedConnection\n\tChildAddedConnection = wax.shared.Connect(wax.shared.LocalPlayer.ChildAdded:Connect(function(Child)\n\t\tif Child:IsA(\"PlayerScripts\") then\n\t\t\twax.shared.PlayerScripts = cloneref(Child)\n\t\t\twax.shared.Disconnect(ChildAddedConnection)\n\t\tend\n\tend))\nend\n--#endregion\n\n--#region @include region ExecutorHelpers\nwax.shared.restorefunction = function(Function: (...any) -> ...any, Silent: boolean?)\n\tlocal Original = wax.shared.Hooks[Function]\n\n\tif Silent and not Original then\n\t\treturn\n\tend\n\n\tassert(Original, \"Function not hooked\")\n\n\tif restorefunction and isfunctionhooked(Function) then\n\t\trestorefunction(Function)\n\telse\n\t\twax.shared.Hooking.HookFunction(Function, Original)\n\tend\n\n\twax.shared.Hooks[Function] = nil\nend\nwax.shared.getrawmetatable = wax.shared.ExecutorSupport[\"getrawmetatable\"].IsWorking\n\t\tand (getrawmetatable or debug.getmetatable)\n\tor function()\n\t\treturn setmetatable({}, {\n\t\t\t__index = function()\n\t\t\t\treturn function() end\n\t\t\tend,\n\t\t})\n\tend\n\nlocal RawGetDebugId = clonefunction and clonefunction(game.GetDebugId) or game.GetDebugId\nwax.shared.GetDebugId = function(Instance)\n\tlocal identity = getthreadidentity()\n\tsetthreadidentity(8)\n\tlocal id = RawGetDebugId(Instance)\n\tsetthreadidentity(identity)\n\treturn id\nend\n\nwax.shared.newcclosure = wax.shared.ExecutorName == \"AWP\"\n\t\tand function(f, name)\n\t\t\tlocal env = getfenv(f)\n\t\t\tlocal x = setmetatable({\n\t\t\t\t__F = f,\n\t\t\t}, {\n\t\t\t\t__index = env,\n\t\t\t\t__newindex = env,\n\t\t\t})\n\n\t\t\tlocal nf = function(...)\n\t\t\t\treturn __F(...)\n\t\t\tend\n\n\t\t\tsetfenv(nf, x) -- set func env (env of nf gets deoptimized)\n\t\t\treturn newcclosure(nf, name)\n\t\tend\n\tor newcclosure\n--#endregion\n\n--#region @include \"Src/Utils/Hook/Luau.luau\" as \"wax.shared.Hooking\"\ndo\n\tlocal Hooking = {}\n\n\tHooking.HookFunction = function(Original, Replacement, Filter)\n\t\tif\n\t\t\twax.shared.IsUsingOthHooks\n\t\t\tand iscclosure(Original)\n\t\tthen\n\t\t\treturn oth.hook(Original, Replacement, Filter)\n\t\tend\n\n\t\tif islclosure(Replacement) then\n\t\t\tReplacement = wax.shared.newcclosure(Replacement)\n\t\tend\n\n\t\tif not wax.shared.ExecutorSupport[\"hookfunction\"].IsWorking then\n\t\t\treturn Original\n\t\tend\n\n\t\treturn hookfunction(Original, Replacement, Filter)\n\tend\n\n\tHooking.HookMetaMethod = function(object, method, hook, filter)\n\t\tlocal Metatable = wax.shared.getrawmetatable(object)\n\t\tlocal originalMethod = rawget(Metatable, method)\n\n\t\tassert(typeof(originalMethod) == \"function\", `{method} is not a function in the metatable of {object}`)\n\n\t\tif wax.shared.IsUsingOthHooks then\n\t\t\treturn oth.hook(originalMethod, hook, filter)\n\t\tend\n\n\t\tif islclosure(hook) then\n\t\t\thook = wax.shared.newcclosure(hook)\n\t\tend\n\n\t\tif\n\t\t\tnot wax.shared.ExecutorSupport[\"hookmetamethod\"].IsWorking\n\t\t\tand wax.shared.ExecutorSupport[\"getrawmetatable\"].IsWorking\n\t\tthen\n\t\t\tsetreadonly(Metatable, false)\n\t\t\trawset(Metatable, method, hook)\n\t\t\tsetreadonly(Metatable, true)\n\n\t\t\treturn originalMethod\n\t\tend\n\n\t\tif not wax.shared.ExecutorSupport[\"hookmetamethod\"].IsWorking then\n\t\t\tif method == \"__index\" then\n\t\t\t\tlocal _, Metamethod = xpcall(function()\n\t\t\t\t\treturn object[tostring(math.random())]\n\t\t\t\tend, function(err)\n\t\t\t\t\treturn debug.info(2, \"f\")\n\t\t\t\tend)\n\n\t\t\t\treturn Metamethod\n\t\t\telseif method == \"__newindex\" then\n\t\t\t\tlocal _, Metamethod = xpcall(function()\n\t\t\t\t\tobject[tostring(math.random())] = true\n\t\t\t\tend, function(err)\n\t\t\t\t\treturn debug.info(2, \"f\")\n\t\t\t\tend)\n\n\t\t\t\treturn Metamethod\n\t\t\telseif method == \"__namecall\" then\n\t\t\t\tlocal _, Metamethod = xpcall(function()\n\t\t\t\t\tobject:Mustard()\n\t\t\t\tend, function(err)\n\t\t\t\t\treturn debug.info(2, \"f\")\n\t\t\t\tend)\n\n\t\t\t\treturn Metamethod\n\t\t\tend\n\n\t\t\treturn nil\n\t\tend\n\n\t\tif filter then\n\t\t\treturn hookmetamethod(object, method, hook, true, filter)\n\t\tend\n\t\t\n\t\treturn hookmetamethod(object, method, hook)\n\tend\n\n\twax.shared.Hooking = Hooking\nend\n--#endregion\n\n--#region @include \"Src/Utils/SafePack.luau\" as \"wax.shared.SafePack\"\ndo\n\t--[[\n\t    SafePack\n\t    Author: centerepic\n\t]]\n\n\tlocal TableProxy = {}\n\n\tlocal UNPACK_CHUNK = 7997\n\tlocal SAFE_LIMIT = 12000\n\n\tfunction TableProxy.Pack(...)\n\t    return { n = select(\"#\", ...), ... }\n\tend\n\n\tfunction TableProxy.Unpack(Tbl, I, J)\n\t    I = I or 1\n\t    J = J or Tbl.n or #Tbl\n\n\t    if J - I + 1 > SAFE_LIMIT then\n\t        J = I + SAFE_LIMIT - 1\n\t    end\n\n\t    if J < I then\n\t        return\n\t    end\n\n\t    if J - I + 1 <= UNPACK_CHUNK then\n\t        return table.unpack(Tbl, I, J)\n\t    end\n\n\t    return Tbl[I], TableProxy.Unpack(Tbl, I + 1, J)\n\tend\n\n\twax.shared.SafePack = TableProxy\nend\n--#endregion\n\n--#region @include \"Src/Utils/Validation/Schema.luau\" as \"wax.shared.ValidationSchema\"\ndo\n\t--// Types \\\\--\n\ttype SchemaKind = \"Any\" | \"Type\" | \"Literal\" | \"Enum\" | \"Array\" | \"Object\" | \"Union\"\n\ttype Refinement = {\n\t\tPredicate: (any) -> boolean,\n\t\tMessage: string,\n\t}\n\ttype SchemaNode = {\n\t\tKind: SchemaKind,\n\t\tExpectedType: string?,\n\t\tLiteral: any?,\n\t\tValues: { any }?,\n\t\tItem: SchemaNode?,\n\t\tShape: { [any]: SchemaNode }?,\n\t\tSchemas: { SchemaNode }?,\n\t\tIsOptional: boolean?,\n\t\tHasDefault: boolean?,\n\t\tDefaultValue: any?,\n\t\tRefinements: { Refinement }?,\n\t\tMinimum: number?,\n\t\tMaximum: number?,\n\t\tInteger: boolean?,\n\t}\n\n\t--// Setup \\\\--\n\tlocal Node = {}\n\tNode.__index = Node\n\n\tlocal Schema = {}\n\n\t--// Helpers \\\\--\n\tlocal function CloneValue(Value)\n\t\tif type(Value) ~= \"table\" then\n\t\t\treturn Value\n\t\tend\n\n\t\tlocal Copy = {}\n\t\tfor Key, Child in Value do\n\t\t\tCopy[CloneValue(Key)] = CloneValue(Child)\n\t\tend\n\t\treturn Copy\n\tend\n\n\tlocal function CloneNode(self: SchemaNode): SchemaNode\n\t\tlocal Copy = table.clone(self)\n\t\tCopy.Refinements = self.Refinements and table.clone(self.Refinements) or nil\n\t\treturn setmetatable(Copy, Node) :: any\n\tend\n\n\tlocal function NewNode(Kind: SchemaKind, Data: { [any]: any }?): SchemaNode\n\t\tlocal NewSchema = Data and table.clone(Data) or {}\n\t\tNewSchema.Kind = Kind\n\t\treturn setmetatable(NewSchema, Node) :: any\n\tend\n\n\tlocal function AddError(Errors: { string }, Path: string, Message: string)\n\t\ttable.insert(Errors, `{Path}: {Message}`)\n\tend\n\n\tlocal function ChildPath(Path: string, Key: any): string\n\t\tif type(Key) == \"number\" then\n\t\t\treturn `{Path}[{Key}]`\n\t\tend\n\t\treturn Path == \"\" and tostring(Key) or `{Path}.{Key}`\n\tend\n\n\tlocal function IsSchema(Value): boolean\n\t\treturn type(Value) == \"table\" and getmetatable(Value) == Node\n\tend\n\n\tlocal function ValidateNode(CurrentSchema: SchemaNode, Value: any, Path: string, Errors: { string }): (boolean, any)\n\t\tif Value == nil then\n\t\t\tif CurrentSchema.HasDefault then\n\t\t\t\treturn true, CloneValue(CurrentSchema.DefaultValue)\n\t\t\tend\n\t\t\tif CurrentSchema.IsOptional then\n\t\t\t\treturn true, nil\n\t\t\tend\n\n\t\t\tAddError(Errors, Path, \"is required\")\n\t\t\treturn false, nil\n\t\tend\n\n\t\tlocal IsValid = true\n\t\tlocal Output = Value\n\t\tlocal Kind = CurrentSchema.Kind\n\n\t\tif Kind == \"Type\" then\n\t\t\tIsValid = typeof(Value) == CurrentSchema.ExpectedType\n\t\t\tif not IsValid then\n\t\t\t\tAddError(Errors, Path, `expected {CurrentSchema.ExpectedType}, got {typeof(Value)}`)\n\t\t\tend\n\t\telseif Kind == \"Literal\" then\n\t\t\tIsValid = Value == CurrentSchema.Literal\n\t\t\tif not IsValid then\n\t\t\t\tAddError(Errors, Path, `expected {tostring(CurrentSchema.Literal)}`)\n\t\t\tend\n\t\telseif Kind == \"Enum\" then\n\t\t\tIsValid = false\n\t\t\tfor _, Option in CurrentSchema.Values or {} do\n\t\t\t\tif Value == Option then\n\t\t\t\t\tIsValid = true\n\t\t\t\t\tbreak\n\t\t\t\tend\n\t\t\tend\n\t\t\tif not IsValid then\n\t\t\t\tlocal Options = {}\n\t\t\t\tfor _, Option in CurrentSchema.Values or {} do\n\t\t\t\t\ttable.insert(Options, tostring(Option))\n\t\t\t\tend\n\t\t\t\tAddError(Errors, Path, `expected one of {table.concat(Options, \", \")}`)\n\t\t\tend\n\t\telseif Kind == \"Array\" then\n\t\t\tif type(Value) ~= \"table\" then\n\t\t\t\tAddError(Errors, Path, `expected table, got {typeof(Value)}`)\n\t\t\t\tIsValid = false\n\t\t\telse\n\t\t\t\tOutput = {}\n\t\t\t\tfor Index, Child in Value do\n\t\t\t\t\tif type(Index) ~= \"number\" or Index % 1 ~= 0 or Index < 1 then\n\t\t\t\t\t\tAddError(Errors, Path, \"expected an array with positive integer keys\")\n\t\t\t\t\t\tIsValid = false\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tend\n\n\t\t\t\t\tlocal ChildValid, ChildOutput = ValidateNode(CurrentSchema.Item :: SchemaNode, Child, ChildPath(Path, Index), Errors)\n\t\t\t\t\tIsValid = ChildValid and IsValid\n\t\t\t\t\tif ChildValid then\n\t\t\t\t\t\tOutput[Index] = ChildOutput\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\t\telseif Kind == \"Object\" then\n\t\t\tif type(Value) ~= \"table\" then\n\t\t\t\tAddError(Errors, Path, `expected table, got {typeof(Value)}`)\n\t\t\t\tIsValid = false\n\t\t\telse\n\t\t\t\tOutput = {}\n\t\t\t\tfor Key, ChildSchema in CurrentSchema.Shape or {} do\n\t\t\t\t\tlocal ChildValid, ChildOutput = ValidateNode(ChildSchema, Value[Key], ChildPath(Path, Key), Errors)\n\t\t\t\t\tIsValid = ChildValid and IsValid\n\t\t\t\t\tif ChildOutput ~= nil then\n\t\t\t\t\t\tOutput[Key] = ChildOutput\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\t\telseif Kind == \"Union\" then\n\t\t\tIsValid = false\n\t\t\tfor _, ChildSchema in CurrentSchema.Schemas or {} do\n\t\t\t\tlocal ChildErrors = {}\n\t\t\t\tlocal ChildValid, ChildOutput = ValidateNode(ChildSchema, Value, Path, ChildErrors)\n\t\t\t\tif ChildValid then\n\t\t\t\t\tIsValid = true\n\t\t\t\t\tOutput = ChildOutput\n\t\t\t\t\tbreak\n\t\t\t\tend\n\t\t\tend\n\t\t\tif not IsValid then\n\t\t\t\tAddError(Errors, Path, \"did not match any allowed schema\")\n\t\t\tend\n\t\tend\n\n\t\tif not IsValid then\n\t\t\treturn false, nil\n\t\tend\n\n\t\tif type(Output) == \"number\" then\n\t\t\tif CurrentSchema.Integer and Output % 1 ~= 0 then\n\t\t\t\tAddError(Errors, Path, \"expected an integer\")\n\t\t\t\tIsValid = false\n\t\t\tend\n\t\t\tif CurrentSchema.Minimum ~= nil and Output < CurrentSchema.Minimum then\n\t\t\t\tAddError(Errors, Path, `must be at least {CurrentSchema.Minimum}`)\n\t\t\t\tIsValid = false\n\t\t\tend\n\t\t\tif CurrentSchema.Maximum ~= nil and Output > CurrentSchema.Maximum then\n\t\t\t\tAddError(Errors, Path, `must be at most {CurrentSchema.Maximum}`)\n\t\t\t\tIsValid = false\n\t\t\tend\n\t\tend\n\n\t\tfor _, Refinement in CurrentSchema.Refinements or {} do\n\t\t\tlocal Success, Result = pcall(Refinement.Predicate, Output)\n\t\t\tif not Success or not Result then\n\t\t\t\tAddError(Errors, Path, Refinement.Message)\n\t\t\t\tIsValid = false\n\t\t\tend\n\t\tend\n\n\t\tif not IsValid then\n\t\t\treturn false, nil\n\t\tend\n\t\treturn true, Output\n\tend\n\n\t--// Modifiers \\\\--\n\tfunction Node:optional(): SchemaNode\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.IsOptional = true\n\t\treturn Copy\n\tend\n\n\tfunction Node:default(Value: any): SchemaNode\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.HasDefault = true\n\t\tCopy.DefaultValue = Value\n\t\treturn Copy\n\tend\n\n\tfunction Node:refine(Predicate: (any) -> boolean, Message: string?): SchemaNode\n\t\tassert(type(Predicate) == \"function\", \"Schema refinement must be a function\")\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.Refinements = Copy.Refinements or {}\n\t\ttable.insert(Copy.Refinements, {\n\t\t\tPredicate = Predicate,\n\t\t\tMessage = Message or \"failed refinement\",\n\t\t})\n\t\treturn Copy\n\tend\n\n\tfunction Node:integer(): SchemaNode\n\t\tassert(self.Kind == \"Type\" and self.ExpectedType == \"number\", \"integer() can only be used on number schemas\")\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.Integer = true\n\t\treturn Copy\n\tend\n\n\tfunction Node:min(Value: number): SchemaNode\n\t\tassert(self.Kind == \"Type\" and self.ExpectedType == \"number\", \"min() can only be used on number schemas\")\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.Minimum = Value\n\t\treturn Copy\n\tend\n\n\tfunction Node:max(Value: number): SchemaNode\n\t\tassert(self.Kind == \"Type\" and self.ExpectedType == \"number\", \"max() can only be used on number schemas\")\n\t\tlocal Copy = CloneNode(self)\n\t\tCopy.Maximum = Value\n\t\treturn Copy\n\tend\n\n\t--// Constructors \\\\--\n\tfunction Schema.any(): SchemaNode\n\t\treturn NewNode(\"Any\")\n\tend\n\n\tfunction Schema.type(ExpectedType: string): SchemaNode\n\t\tassert(type(ExpectedType) == \"string\", \"Schema type must be a string\")\n\t\treturn NewNode(\"Type\", { ExpectedType = ExpectedType })\n\tend\n\n\tfunction Schema.string(): SchemaNode\n\t\treturn Schema.type(\"string\")\n\tend\n\n\tfunction Schema.number(): SchemaNode\n\t\treturn Schema.type(\"number\")\n\tend\n\n\tfunction Schema.boolean(): SchemaNode\n\t\treturn Schema.type(\"boolean\")\n\tend\n\n\tfunction Schema.table(): SchemaNode\n\t\treturn Schema.type(\"table\")\n\tend\n\n\tfunction Schema.callback(): SchemaNode\n\t\treturn Schema.type(\"function\")\n\tend\n\n\tfunction Schema.instance(ClassName: string?): SchemaNode\n\t\tlocal InstanceSchema = Schema.type(\"Instance\")\n\t\tif ClassName then\n\t\t\treturn InstanceSchema:refine(function(Value)\n\t\t\t\treturn Value:IsA(ClassName)\n\t\t\tend, `expected an Instance that is a {ClassName}`)\n\t\tend\n\t\treturn InstanceSchema\n\tend\n\n\tfunction Schema.literal(Value: any): SchemaNode\n\t\tassert(Value ~= nil, \"Schema literal cannot be nil; use optional() instead\")\n\t\treturn NewNode(\"Literal\", { Literal = Value })\n\tend\n\n\tfunction Schema.enum(Values: { any }): SchemaNode\n\t\tassert(type(Values) == \"table\" and #Values > 0, \"Schema enum requires at least one value\")\n\t\treturn NewNode(\"Enum\", { Values = table.clone(Values) })\n\tend\n\n\tfunction Schema.array(ItemSchema: SchemaNode): SchemaNode\n\t\tassert(IsSchema(ItemSchema), \"Schema array requires an item schema\")\n\t\treturn NewNode(\"Array\", { Item = ItemSchema })\n\tend\n\n\tfunction Schema.object(Shape: { [any]: SchemaNode }): SchemaNode\n\t\tassert(type(Shape) == \"table\", \"Schema object requires a shape\")\n\t\tfor Key, ChildSchema in Shape do\n\t\t\tassert(IsSchema(ChildSchema), `Schema object field {tostring(Key)} must be a schema`)\n\t\tend\n\t\treturn NewNode(\"Object\", { Shape = table.clone(Shape) })\n\tend\n\n\tfunction Schema.union(Schemas: { SchemaNode }): SchemaNode\n\t\tassert(type(Schemas) == \"table\" and #Schemas > 0, \"Schema union requires at least one schema\")\n\t\tfor _, ChildSchema in Schemas do\n\t\t\tassert(IsSchema(ChildSchema), \"Schema union entries must be schemas\")\n\t\tend\n\t\treturn NewNode(\"Union\", { Schemas = table.clone(Schemas) })\n\tend\n\n\t--// Validation \\\\--\n\tfunction Schema.Validate(DataSchema: SchemaNode, Value: any): (boolean, any, { string })\n\t\tassert(IsSchema(DataSchema), \"ValidateSchema requires a schema created by Validation.Schema\")\n\t\tlocal Errors = {}\n\t\tlocal IsValid, Output = ValidateNode(DataSchema, Value, \"Value\", Errors)\n\t\treturn IsValid, Output, Errors\n\tend\n\n\twax.shared.ValidationSchema = Schema\nend\n--#endregion\n\n--#region @include \"Src/Utils/Validation/init.luau\" as \"wax.shared.Validation\"\ndo\n\t--// Imports \\\\--\n\tlocal Schema = wax.shared.ValidationSchema or require(script.Schema)\n\n\t--// Module \\\\--\n\tlocal Validation = {\n\t\tSchema = Schema,\n\t}\n\n\t--// Functions \\\\--\n\tfunction Validation.FillTemplate(Data, Template)\n\t\tlocal NewData = {}\n\t\tfor Key, Value in Template do\n\t\t\tif Data[Key] == nil or typeof(Data[Key]) ~= typeof(Value) then\n\t\t\t\tNewData[Key] = Value\n\t\t\telse\n\t\t\t\tNewData[Key] = Data[Key]\n\t\t\tend\n\t\tend\n\n\t\treturn NewData\n\tend\n\n\tfunction Validation.ValidateSchema(Data, DataSchema)\n\t\treturn Schema.Validate(DataSchema, Data)\n\tend\n\n\twax.shared.Validation = Validation\nend\n--#endregion\n\n--#region @include \"Src/Utils/CallFilter/Operators.luau\" as \"wax.shared.CallFilterOperators\"\ndo\n\tlocal Operators = {}\n\n\tlocal Registry = {\n\t\tEquals = {\n\t\t\tText = \"==\",\n\t\t\tAllowedTypes = { boolean = true, number = true, string = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn Value == Expected\n\t\t\tend,\n\t\t},\n\t\tNotEquals = {\n\t\t\tText = \"~=\",\n\t\t\tAllowedTypes = { boolean = true, number = true, string = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn Value ~= Expected\n\t\t\tend,\n\t\t},\n\t\tLessThan = {\n\t\t\tText = \"<\",\n\t\t\tNumericComparison = true,\n\t\t\tAllowedTypes = { number = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"number\" and typeof(Expected) == \"number\" and Value < Expected\n\t\t\tend,\n\t\t},\n\t\tLessThanOrEqual = {\n\t\t\tText = \"<=\",\n\t\t\tNumericComparison = true,\n\t\t\tAllowedTypes = { number = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"number\" and typeof(Expected) == \"number\" and Value <= Expected\n\t\t\tend,\n\t\t},\n\t\tGreaterThan = {\n\t\t\tText = \">\",\n\t\t\tNumericComparison = true,\n\t\t\tAllowedTypes = { number = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"number\" and typeof(Expected) == \"number\" and Value > Expected\n\t\t\tend,\n\t\t},\n\t\tGreaterThanOrEqual = {\n\t\t\tText = \">=\",\n\t\t\tNumericComparison = true,\n\t\t\tAllowedTypes = { number = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"number\" and typeof(Expected) == \"number\" and Value >= Expected\n\t\t\tend,\n\t\t},\n\t\tContains = {\n\t\t\tText = \"Contains\",\n\t\t\tSummaryText = \"contains\",\n\t\t\tAllowedTypes = { string = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"string\"\n\t\t\t\t\tand typeof(Expected) == \"string\"\n\t\t\t\t\tand string.find(Value, Expected, 1, true) ~= nil\n\t\t\tend,\n\t\t},\n\t\tStartsWith = {\n\t\t\tText = \"Starts with\",\n\t\t\tSummaryText = \"starts with\",\n\t\t\tAllowedTypes = { string = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"string\"\n\t\t\t\t\tand typeof(Expected) == \"string\"\n\t\t\t\t\tand string.sub(Value, 1, #Expected) == Expected\n\t\t\tend,\n\t\t},\n\t\tEndsWith = {\n\t\t\tText = \"Ends with\",\n\t\t\tSummaryText = \"ends with\",\n\t\t\tAllowedTypes = { string = true },\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == \"string\"\n\t\t\t\t\tand typeof(Expected) == \"string\"\n\t\t\t\t\tand (Expected == \"\" or string.sub(Value, -#Expected) == Expected)\n\t\t\tend,\n\t\t},\n\t\tTypeIs = {\n\t\t\tText = \"Type\",\n\t\t\tSummaryText = \"type\",\n\t\t\tEvaluate = function(Value, Expected)\n\t\t\t\treturn typeof(Value) == tostring(Expected)\n\t\t\tend,\n\t\t},\n\t}\n\n\tlocal Order = {\n\t\t\"Equals\",\n\t\t\"NotEquals\",\n\t\t\"LessThan\",\n\t\t\"LessThanOrEqual\",\n\t\t\"GreaterThan\",\n\t\t\"GreaterThanOrEqual\",\n\t\t\"Contains\",\n\t\t\"StartsWith\",\n\t\t\"EndsWith\",\n\t\t\"TypeIs\",\n\t}\n\n\tlocal TypeNames = {\n\t\t\"nil\",\n\t\t\"boolean\",\n\t\t\"number\",\n\t\t\"string\",\n\t\t\"table\",\n\t\t\"function\",\n\t\t\"thread\",\n\t\t\"userdata\",\n\t\t\"Instance\",\n\t\t\"EnumItem\",\n\t\t\"RBXScriptSignal\",\n\t\t\"RBXScriptConnection\",\n\t\t\"Vector2\",\n\t\t\"Vector3\",\n\t\t\"CFrame\",\n\t\t\"Color3\",\n\t\t\"BrickColor\",\n\t\t\"UDim\",\n\t\t\"UDim2\",\n\t\t\"Rect\",\n\t\t\"Ray\",\n\t\t\"buffer\",\n\t}\n\n\tlocal TypeNameLookup = {}\n\tfor _, TypeName in TypeNames do\n\t\tTypeNameLookup[TypeName] = true\n\tend\n\n\tlocal function GetSubjectKey(Subject): string\n\t\treturn if Subject.Type == \"ArgumentCount\" then \"ArgumentCount\" else `Argument:{Subject.Index}`\n\tend\n\n\tlocal function FormatSubject(Subject): string\n\t\treturn if Subject.Type == \"ArgumentCount\" then \"#Arg\" else `Arg[{Subject.Index}]`\n\tend\n\n\tlocal function GetAndGroupRange(Conditions, Condition)\n\t\tlocal ConditionIndex = table.find(Conditions, Condition)\n\t\tif not ConditionIndex then\n\t\t\treturn 1, #Conditions\n\t\tend\n\n\t\tlocal FirstIndex = 1\n\t\tfor Index = ConditionIndex, 2, -1 do\n\t\t\tif Conditions[Index].Join == \"Or\" then\n\t\t\t\tFirstIndex = Index\n\t\t\t\tbreak\n\t\t\tend\n\t\tend\n\n\t\tlocal LastIndex = #Conditions\n\t\tfor Index = ConditionIndex + 1, #Conditions do\n\t\t\tif Conditions[Index].Join == \"Or\" then\n\t\t\t\tLastIndex = Index - 1\n\t\t\t\tbreak\n\t\t\tend\n\t\tend\n\n\t\treturn FirstIndex, LastIndex\n\tend\n\n\tlocal function FormatValue(Value): string\n\t\treturn if typeof(Value) == \"string\" then `\"{Value}\"` else tostring(Value)\n\tend\n\n\tfunction Operators.Get(Operator)\n\t\treturn Registry[Operator]\n\tend\n\n\tfunction Operators.GetOptions()\n\t\tlocal Options = {}\n\t\tfor _, Operator in Order do\n\t\t\tlocal Definition = Registry[Operator]\n\t\t\ttable.insert(Options, {\n\t\t\t\tValue = Operator,\n\t\t\t\tText = Definition.Text,\n\t\t\t})\n\t\tend\n\t\treturn Options\n\tend\n\n\tfunction Operators.GetTypeNames()\n\t\treturn table.clone(TypeNames)\n\tend\n\n\tfunction Operators.IsTypeName(Value): boolean\n\t\treturn type(Value) == \"string\" and TypeNameLookup[Value] == true\n\tend\n\n\tfunction Operators.GetText(Operator, Summary: boolean?): string\n\t\tlocal Definition = Registry[Operator]\n\t\tif not Definition then\n\t\t\treturn tostring(Operator)\n\t\tend\n\t\treturn Summary and Definition.SummaryText or Definition.Text\n\tend\n\n\tfunction Operators.FormatValue(Value): string\n\t\treturn FormatValue(Value)\n\tend\n\n\tfunction Operators.IsNumericComparison(Operator): boolean\n\t\tlocal Definition = Registry[Operator]\n\t\treturn Definition ~= nil and Definition.NumericComparison == true\n\tend\n\n\tfunction Operators.Evaluate(Operator, Value, Expected): boolean\n\t\tlocal Definition = Registry[Operator]\n\t\treturn Definition ~= nil and Definition.Evaluate(Value, Expected) or false\n\tend\n\n\tfunction Operators.ResolveSubject(Subject, Arguments)\n\t\tif Subject.Type == \"ArgumentCount\" then\n\t\t\treturn Arguments.n or #Arguments\n\t\tend\n\n\t\treturn Arguments[Subject.Index]\n\tend\n\n\tfunction Operators.MatchesCondition(Condition, Arguments): boolean\n\t\treturn Operators.Evaluate(Condition.Operator, Operators.ResolveSubject(Condition.Subject, Arguments), Condition.Value)\n\tend\n\n\tfunction Operators.Matches(Conditions, ResolveValue): boolean\n\t\tif #Conditions == 0 then\n\t\t\treturn true\n\t\tend\n\n\t\tlocal AnyGroupMatches = false\n\t\tlocal CurrentGroupMatches = Operators.Evaluate(\n\t\t\tConditions[1].Operator,\n\t\t\tResolveValue(Conditions[1]),\n\t\t\tConditions[1].Value\n\t\t)\n\t\tfor Index = 2, #Conditions do\n\t\t\tlocal Condition = Conditions[Index]\n\t\t\tlocal Matches = Operators.Evaluate(Condition.Operator, ResolveValue(Condition), Condition.Value)\n\t\t\tif Condition.Join == \"Or\" then\n\t\t\t\tAnyGroupMatches = AnyGroupMatches or CurrentGroupMatches\n\t\t\t\tCurrentGroupMatches = Matches\n\t\t\telse\n\t\t\t\tCurrentGroupMatches = CurrentGroupMatches and Matches\n\t\t\tend\n\t\tend\n\n\t\treturn AnyGroupMatches or CurrentGroupMatches\n\tend\n\n\tfunction Operators.MatchesConditions(Conditions, Arguments): boolean\n\t\treturn Operators.Matches(Conditions, function(Condition)\n\t\t\treturn Operators.ResolveSubject(Condition.Subject, Arguments)\n\t\tend)\n\tend\n\n\tfunction Operators.GetConditionType(Conditions, Condition): string?\n\t\tif Condition.Subject.Type == \"ArgumentCount\" then\n\t\t\treturn \"number\"\n\t\tend\n\n\t\tlocal SubjectKey = GetSubjectKey(Condition.Subject)\n\t\tlocal FirstIndex, LastIndex = GetAndGroupRange(Conditions, Condition)\n\t\tfor Index = FirstIndex, LastIndex do\n\t\t\tlocal OtherCondition = Conditions[Index]\n\t\t\tif\n\t\t\t\tOtherCondition ~= Condition\n\t\t\t\tand GetSubjectKey(OtherCondition.Subject) == SubjectKey\n\t\t\t\tand OtherCondition.Operator == \"TypeIs\"\n\t\t\tthen\n\t\t\t\treturn tostring(OtherCondition.Value)\n\t\t\tend\n\t\tend\n\n\t\tif Condition.Operator == \"TypeIs\" then\n\t\t\treturn tostring(Condition.Value)\n\t\tend\n\n\t\tlocal ValueType = typeof(Condition.Value)\n\t\tif ValueType == \"boolean\" or ValueType == \"number\" then\n\t\t\treturn ValueType\n\t\tend\n\n\t\tfor Index = FirstIndex, LastIndex do\n\t\t\tlocal OtherCondition = Conditions[Index]\n\t\t\tlocal OtherValueType = typeof(OtherCondition.Value)\n\t\t\tif\n\t\t\t\tOtherCondition ~= Condition\n\t\t\t\tand GetSubjectKey(OtherCondition.Subject) == SubjectKey\n\t\t\t\tand (OtherValueType == \"boolean\" or OtherValueType == \"number\")\n\t\t\tthen\n\t\t\t\treturn OtherValueType\n\t\t\tend\n\t\tend\n\n\t\treturn if ValueType == \"string\" then \"string\" else nil\n\tend\n\n\tfunction Operators.IsAllowed(Conditions, Condition, Operator): boolean\n\t\tif Operator == \"TypeIs\" then\n\t\t\treturn Condition.Subject.Type == \"Argument\"\n\t\tend\n\n\t\tlocal Definition = Registry[Operator]\n\t\tif not Definition then\n\t\t\treturn false\n\t\tend\n\n\t\tlocal ConditionType = Operators.GetConditionType(Conditions, Condition)\n\t\treturn ConditionType == nil or Definition.AllowedTypes[ConditionType] == true\n\tend\n\n\tfunction Operators.IsConditionValid(Conditions, Condition): boolean\n\t\tlocal Definition = Registry[Condition.Operator]\n\t\tif not Definition then\n\t\t\treturn false\n\t\tend\n\n\t\tif Condition.Operator == \"TypeIs\" then\n\t\t\treturn Condition.Subject.Type == \"Argument\" and Operators.IsTypeName(Condition.Value)\n\t\tend\n\n\t\tlocal ConditionType = Operators.GetConditionType(Conditions, Condition)\n\t\treturn ConditionType ~= nil\n\t\t\tand Definition.AllowedTypes ~= nil\n\t\t\tand Definition.AllowedTypes[ConditionType] == true\n\t\t\tand typeof(Condition.Value) == ConditionType\n\tend\n\n\tlocal function NumericConditionsConflict(First, Second): boolean\n\t\tif typeof(First.Value) ~= \"number\" or typeof(Second.Value) ~= \"number\" then\n\t\t\treturn false\n\t\tend\n\n\t\tif First.Operator == \"Equals\" and Operators.IsNumericComparison(Second.Operator) then\n\t\t\treturn not Operators.Evaluate(Second.Operator, First.Value, Second.Value)\n\t\telseif Second.Operator == \"Equals\" and Operators.IsNumericComparison(First.Operator) then\n\t\t\treturn not Operators.Evaluate(First.Operator, Second.Value, First.Value)\n\t\telseif not Operators.IsNumericComparison(First.Operator) or not Operators.IsNumericComparison(Second.Operator) then\n\t\t\treturn false\n\t\tend\n\n\t\tlocal FirstIsLower = First.Operator == \"GreaterThan\" or First.Operator == \"GreaterThanOrEqual\"\n\t\tlocal SecondIsLower = Second.Operator == \"GreaterThan\" or Second.Operator == \"GreaterThanOrEqual\"\n\t\tif FirstIsLower == SecondIsLower then\n\t\t\treturn false\n\t\tend\n\n\t\tlocal Lower = if FirstIsLower then First else Second\n\t\tlocal Upper = if FirstIsLower then Second else First\n\t\treturn Lower.Value > Upper.Value\n\t\t\tor Lower.Value == Upper.Value and (Lower.Operator == \"GreaterThan\" or Upper.Operator == \"LessThan\")\n\tend\n\n\tlocal function AreInSameAndBranch(Conditions, FirstIndex: number, SecondIndex: number): boolean\n\t\tfor Index = FirstIndex + 1, SecondIndex do\n\t\t\tif Conditions[Index].Join == \"Or\" then\n\t\t\t\treturn false\n\t\t\tend\n\t\tend\n\t\treturn true\n\tend\n\n\tfunction Operators.Validate(Conditions, Adapter)\n\t\tlocal Errors = {}\n\t\tlocal Conflicts = {}\n\t\tlocal GetKey = Adapter and Adapter.GetKey or function(Condition)\n\t\t\treturn GetSubjectKey(Condition.Subject)\n\t\tend\n\t\tlocal GetLabel = Adapter and Adapter.GetLabel or function(Condition)\n\t\t\treturn FormatSubject(Condition.Subject)\n\t\tend\n\t\tlocal IsConditionValid = Adapter and Adapter.IsConditionValid or function(Condition)\n\t\t\treturn Operators.IsConditionValid(Conditions, Condition)\n\t\tend\n\n\t\tlocal function AddConflict(FirstIndex: number, SecondIndex: number, Message: string)\n\t\t\tConflicts[FirstIndex] = true\n\t\t\tConflicts[SecondIndex] = true\n\t\t\ttable.insert(Errors, Message)\n\t\tend\n\n\t\tfor Index, Condition in Conditions do\n\t\t\tif not IsConditionValid(Condition) then\n\t\t\t\tConflicts[Index] = true\n\t\t\t\ttable.insert(\n\t\t\t\t\tErrors,\n\t\t\t\t\t`{GetLabel(Condition)} has a value that is incompatible with {Operators.GetText(Condition.Operator, true)}.`\n\t\t\t\t)\n\t\t\tend\n\t\tend\n\n\t\tfor FirstIndex = 1, #Conditions do\n\t\t\tlocal First = Conditions[FirstIndex]\n\t\t\tfor SecondIndex = FirstIndex + 1, #Conditions do\n\t\t\t\tlocal Second = Conditions[SecondIndex]\n\t\t\t\tif Conflicts[FirstIndex] or Conflicts[SecondIndex] then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\t\t\t\tif GetKey(First) ~= GetKey(Second) or not AreInSameAndBranch(Conditions, FirstIndex, SecondIndex) then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\t\t\t\tlocal SubjectText = GetLabel(First)\n\n\t\t\t\tif First.Operator == \"Equals\" and Second.Operator == \"Equals\" and First.Value ~= Second.Value then\n\t\t\t\t\tAddConflict(FirstIndex, SecondIndex, `{SubjectText} cannot equal both {FormatValue(First.Value)} and {FormatValue(Second.Value)}.`)\n\t\t\t\telseif\n\t\t\t\t\tFirst.Operator == \"Equals\" and Second.Operator == \"NotEquals\" and First.Value == Second.Value\n\t\t\t\t\tor First.Operator == \"NotEquals\" and Second.Operator == \"Equals\" and First.Value == Second.Value\n\t\t\t\tthen\n\t\t\t\t\tAddConflict(FirstIndex, SecondIndex, `{SubjectText} cannot both equal and not equal {FormatValue(First.Value)}.`)\n\t\t\t\telseif First.Operator == \"TypeIs\" and Second.Operator == \"TypeIs\" and First.Value ~= Second.Value then\n\t\t\t\t\tAddConflict(FirstIndex, SecondIndex, `{SubjectText} cannot have both type {First.Value} and {Second.Value}.`)\n\t\t\t\telseif NumericConditionsConflict(First, Second) then\n\t\t\t\t\tAddConflict(FirstIndex, SecondIndex, `{SubjectText} cannot satisfy both numeric comparisons.`)\n\t\t\t\telse\n\t\t\t\t\tlocal TypeCondition\n\t\t\t\t\tlocal OtherCondition\n\t\t\t\t\tif First.Operator == \"TypeIs\" then\n\t\t\t\t\t\tTypeCondition, OtherCondition = First, Second\n\t\t\t\t\telseif Second.Operator == \"TypeIs\" then\n\t\t\t\t\t\tTypeCondition, OtherCondition = Second, First\n\t\t\t\t\tend\n\n\t\t\t\t\tif TypeCondition and OtherCondition and OtherCondition.Operator ~= \"TypeIs\" then\n\t\t\t\t\t\tlocal Definition = Registry[OtherCondition.Operator]\n\t\t\t\t\t\tlocal TypeName = tostring(TypeCondition.Value)\n\t\t\t\t\t\tif Definition and Definition.AllowedTypes and not Definition.AllowedTypes[TypeName] then\n\t\t\t\t\t\t\tAddConflict(FirstIndex, SecondIndex, `{SubjectText} has type {TypeName}, so it cannot use {Definition.SummaryText or Definition.Text}.`)\n\t\t\t\t\t\tend\n\t\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\t\tend\n\n\t\treturn #Errors == 0, Errors, Conflicts\n\tend\n\n\twax.shared.CallFilterOperators = Operators\nend\n--#endregion\n\n--#region @include \"Src/Utils/CallFilter/RemoteFields.luau\" as \"wax.shared.CallFilterRemoteFields\"\ndo\n\tlocal Operators = wax.shared.CallFilterOperators or require(\"@src/Utils/CallFilter/Operators\")\n\n\tlocal RemoteFields = {}\n\n\tlocal RemoteClassOptions = {\n\t\t{ Value = \"RemoteEvent\", Text = \"RemoteEvent\" },\n\t\t{ Value = \"RemoteFunction\", Text = \"RemoteFunction\" },\n\t\t{ Value = \"UnreliableRemoteEvent\", Text = \"UnreliableRemoteEvent\" },\n\t\t{ Value = \"BindableEvent\", Text = \"BindableEvent\" },\n\t\t{ Value = \"BindableFunction\", Text = \"BindableFunction\" },\n\t}\n\n\tlocal Registry = {\n\t\tName = {\n\t\t\tText = \"Name\",\n\t\t\tGetValue = function(Remote)\n\t\t\t\treturn Remote.Name\n\t\t\tend,\n\t\t},\n\t\tClassName = {\n\t\t\tText = \"Class\",\n\t\t\tValueOptions = RemoteClassOptions,\n\t\t\tGetValue = function(Remote)\n\t\t\t\treturn Remote.ClassName\n\t\t\tend,\n\t\t},\n\t\tFullName = {\n\t\t\tText = \"Full path\",\n\t\t\tGetValue = function(Remote)\n\t\t\t\tlocal Success, Result = pcall(Remote.GetFullName, Remote)\n\t\t\t\treturn Success and Result or Remote.Name\n\t\t\tend,\n\t\t},\n\t}\n\n\tlocal Order = { \"Name\", \"ClassName\", \"FullName\" }\n\tlocal StringOperators = {\n\t\tEquals = true,\n\t\tNotEquals = true,\n\t\tContains = true,\n\t\tStartsWith = true,\n\t\tEndsWith = true,\n\t}\n\n\tfunction RemoteFields.Get(Field)\n\t\treturn Registry[Field]\n\tend\n\n\tfunction RemoteFields.GetOptions()\n\t\tlocal Options = {}\n\t\tfor _, Field in Order do\n\t\t\ttable.insert(Options, {\n\t\t\t\tValue = Field,\n\t\t\t\tText = Registry[Field].Text,\n\t\t\t})\n\t\tend\n\t\treturn Options\n\tend\n\n\tfunction RemoteFields.GetNames()\n\t\treturn table.clone(Order)\n\tend\n\n\tfunction RemoteFields.GetText(Field): string\n\t\tlocal Definition = Registry[Field]\n\t\treturn Definition and Definition.Text or tostring(Field)\n\tend\n\n\tfunction RemoteFields.GetValueOptions(Field)\n\t\tlocal Definition = Registry[Field]\n\t\treturn Definition and Definition.ValueOptions and table.clone(Definition.ValueOptions) or nil\n\tend\n\n\tfunction RemoteFields.IsValueAllowed(Field, Value): boolean\n\t\tlocal Options = RemoteFields.GetValueOptions(Field)\n\t\tif not Options then\n\t\t\treturn typeof(Value) == \"string\"\n\t\tend\n\n\t\tfor _, Option in Options do\n\t\t\tif Option.Value == Value then\n\t\t\t\treturn true\n\t\t\tend\n\t\tend\n\t\treturn false\n\tend\n\n\tfunction RemoteFields.IsOperatorAllowed(Operator, Field): boolean\n\t\tif Field == \"ClassName\" then\n\t\t\treturn Operator == \"Equals\" or Operator == \"NotEquals\"\n\t\tend\n\t\treturn StringOperators[Operator] == true\n\tend\n\n\tfunction RemoteFields.IsConditionValid(Condition): boolean\n\t\treturn Registry[Condition.Field] ~= nil\n\t\t\tand RemoteFields.IsOperatorAllowed(Condition.Operator, Condition.Field)\n\t\t\tand RemoteFields.IsValueAllowed(Condition.Field, Condition.Value)\n\tend\n\n\tfunction RemoteFields.Validate(Conditions)\n\t\treturn Operators.Validate(Conditions, {\n\t\t\tGetKey = function(Condition)\n\t\t\t\treturn Condition.Field\n\t\t\tend,\n\t\t\tGetLabel = function(Condition)\n\t\t\t\treturn RemoteFields.GetText(Condition.Field)\n\t\t\tend,\n\t\t\tIsConditionValid = RemoteFields.IsConditionValid,\n\t\t})\n\tend\n\n\tfunction RemoteFields.Matches(Conditions, Remote): boolean\n\t\treturn Operators.Matches(Conditions, function(Condition)\n\t\t\tlocal Definition = Registry[Condition.Field]\n\t\t\treturn Definition and Definition.GetValue(Remote) or nil\n\t\tend)\n\tend\n\n\twax.shared.CallFilterRemoteFields = RemoteFields\nend\n--#endregion\n\n--#region @include \"Src/Utils/CallFilter/Schema.luau\" as \"wax.shared.CallFilterSchema\"\ndo\n\t--// Imports \\\\--\n\tlocal Validation = wax.shared.Validation or require(\"@src/Utils/Validation\")\n\tlocal Operators = wax.shared.CallFilterOperators or require(\"@src/Utils/CallFilter/Operators\")\n\tlocal RemoteFields = wax.shared.CallFilterRemoteFields or require(\"@src/Utils/CallFilter/RemoteFields\")\n\n\tlocal Schema = Validation.Schema\n\n\t--// Helpers \\\\--\n\tlocal function GetOperatorNames()\n\t\tlocal Names = {}\n\t\tfor _, Option in Operators.GetOptions() do\n\t\t\ttable.insert(Names, Option.Value)\n\t\tend\n\t\treturn Names\n\tend\n\n\tlocal function IsConditionValueValid(Condition): boolean\n\t\treturn Operators.IsConditionValid({ Condition }, Condition)\n\tend\n\n\tlocal function HasNoConditionConflicts(Conditions): boolean\n\t\treturn Operators.Validate(Conditions)\n\tend\n\n\t--// Schemas \\\\--\n\tlocal Remote = Schema.instance():refine(function(Value)\n\t\treturn RemoteFields.IsValueAllowed(\"ClassName\", Value.ClassName)\n\tend, \"must be a supported remote\")\n\n\tlocal Subject = Schema.object({\n\t\tType = Schema.enum({ \"Argument\", \"ArgumentCount\" }),\n\t\tIndex = Schema.number():integer():min(1):optional(),\n\t}):refine(function(Value)\n\t\treturn Value.Type == \"ArgumentCount\" and Value.Index == nil or Value.Type == \"Argument\" and Value.Index ~= nil\n\tend, \"must provide an index only for argument subjects\")\n\n\tlocal Condition = Schema.object({\n\t\tSubject = Subject,\n\t\tOperator = Schema.enum(GetOperatorNames()),\n\t\tValue = Schema.any():optional(),\n\t\tJoin = Schema.enum({ \"And\", \"Or\" }):optional(),\n\t}):refine(IsConditionValueValid, \"has a value that is incompatible with its operator\")\n\n\tlocal ConditionArray = Schema.array(Condition):refine(HasNoConditionConflicts, \"contains conflicting conditions\")\n\tlocal Conditions = ConditionArray:default({})\n\n\tlocal RemoteCondition = Schema.object({\n\t\tField = Schema.enum(RemoteFields.GetNames()),\n\t\tOperator = Schema.enum(GetOperatorNames()),\n\t\tValue = Schema.string(),\n\t\tJoin = Schema.enum({ \"And\", \"Or\" }):optional(),\n\t}):refine(RemoteFields.IsConditionValid, \"has an operator or value that is incompatible with its field\")\n\n\tlocal RemoteConditions = Schema.array(RemoteCondition):refine(function(Value)\n\t\treturn #Value > 0 and RemoteFields.Validate(Value)\n\tend, \"must contain at least one non-conflicting remote condition\")\n\n\tlocal Target = Schema.union({\n\t\tSchema.object({\n\t\t\tType = Schema.literal(\"Instance\"),\n\t\t\tRemote = Remote,\n\t\t}),\n\t\tSchema.object({\n\t\t\tType = Schema.literal(\"Query\"),\n\t\t\tConditions = RemoteConditions,\n\t\t}),\n\t})\n\n\tlocal Filter = Schema.object({\n\t\tId = Schema.string():optional(),\n\t\tEnabled = Schema.boolean():default(true),\n\t\tTarget = Target,\n\t\tDirection = Schema.enum({ \"Outgoing\", \"Incoming\", \"Any\" }),\n\t\tConditions = Conditions,\n\t\tAction = Schema.enum({ \"Ignore\", \"Block\", \"Highlight\" }):default(\"Ignore\"),\n\t})\n\n\tlocal Update = Schema.object({\n\t\tEnabled = Schema.boolean():optional(),\n\t\tTarget = Target:optional(),\n\t\tDirection = Schema.enum({ \"Outgoing\", \"Incoming\", \"Any\" }):optional(),\n\t\tConditions = ConditionArray:optional(),\n\t\tAction = Schema.enum({ \"Ignore\", \"Block\", \"Highlight\" }):optional(),\n\t})\n\n\twax.shared.CallFilterSchema = {\n\t\tRemote = Remote,\n\t\tSubject = Subject,\n\t\tCondition = Condition,\n\t\tConditions = Conditions,\n\t\tRemoteCondition = RemoteCondition,\n\t\tRemoteConditions = RemoteConditions,\n\t\tTarget = Target,\n\t\tFilter = Filter,\n\t\tUpdate = Update,\n\t}\nend\n--#endregion\n\n--#region @include \"Src/Utils/CallFilter/Manager.luau\" as \"wax.shared.CallFilters\"\ndo\n\tlocal Operators = wax.shared.CallFilterOperators or require(\"@src/Utils/CallFilter/Operators\")\n\tlocal InstanceSerializer = wax.shared.InstanceSerializer or require(\"@src/Utils/CodeGen/Serializer/Instance\")\n\tlocal Validation = wax.shared.Validation or require(\"@src/Utils/Validation\")\n\tlocal CallFilterSchema = wax.shared.CallFilterSchema or require(\"@src/Utils/CallFilter/Schema\")\n\tlocal RemoteFields = wax.shared.CallFilterRemoteFields or require(\"@src/Utils/CallFilter/RemoteFields\")\n\n\tlocal CallFilters = {\n\t\tItems = {},\n\t\tById = {},\n\t\tListeners = {},\n\t}\n\n\tlocal ActionPriorities = {\n\t\tHighlight = 1,\n\t\tIgnore = 2,\n\t\tBlock = 3,\n\t}\n\n\tlocal function Validate(Data, DataSchema, Context: string)\n\t\tlocal IsValid, Result, Errors = Validation.ValidateSchema(Data, DataSchema)\n\t\tassert(IsValid, `{Context}: {Errors[1] or \"validation failed\"}`)\n\t\treturn Result\n\tend\n\n\tlocal function CopyFilter(Filter)\n\t\tlocal Copy = table.clone(Filter)\n\t\tCopy.Conditions = {}\n\n\t\tfor _, Condition in Filter.Conditions or {} do\n\t\t\tlocal ConditionCopy = table.clone(Condition)\n\t\t\tConditionCopy.Subject = table.clone(Condition.Subject)\n\t\t\ttable.insert(Copy.Conditions, ConditionCopy)\n\t\tend\n\n\t\tCopy.Target = table.clone(Filter.Target)\n\t\tif Filter.Target.Type == \"Query\" then\n\t\t\tCopy.Target.Conditions = {}\n\t\t\tfor _, Condition in Filter.Target.Conditions do\n\t\t\t\ttable.insert(Copy.Target.Conditions, table.clone(Condition))\n\t\t\tend\n\t\tend\n\n\t\tCopy.Enabled = Filter.Enabled ~= false\n\t\treturn Copy\n\tend\n\n\tlocal function EmitChanged()\n\t\tlocal Snapshot = CallFilters:GetAll()\n\t\tfor Listener in CallFilters.Listeners do\n\t\t\tif task then\n\t\t\t\ttask.spawn(Listener, Snapshot)\n\t\t\telse\n\t\t\t\tListener(Snapshot)\n\t\t\tend\n\t\tend\n\tend\n\n\tfunction CallFilters:GetAll()\n\t\tlocal Filters = {}\n\t\tfor _, Filter in self.Items do\n\t\t\ttable.insert(Filters, CopyFilter(Filter))\n\t\tend\n\t\treturn Filters\n\tend\n\n\tfunction CallFilters:Get(Id: string)\n\t\tlocal Filter = self.ById[Id]\n\t\treturn Filter and CopyFilter(Filter) or nil\n\tend\n\n\tfunction CallFilters:Add(Filter)\n\t\tlocal Copy = Validate(Filter, CallFilterSchema.Filter, \"Invalid call filter\")\n\t\tCopy.Id = Copy.Id or wax.shared.HttpService:GenerateGUID(false)\n\t\tassert(not self.ById[Copy.Id], `A call filter with id {Copy.Id} already exists`)\n\n\t\ttable.insert(self.Items, Copy)\n\t\tself.ById[Copy.Id] = Copy\n\t\tEmitChanged()\n\t\treturn CopyFilter(Copy)\n\tend\n\n\tfunction CallFilters:Update(Id: string, Changes)\n\t\tlocal Filter = self.ById[Id]\n\t\tif not Filter then\n\t\t\treturn nil\n\t\tend\n\n\t\tlocal ValidChanges = Validate(Changes, CallFilterSchema.Update, \"Invalid call filter update\")\n\t\tlocal Updated = CopyFilter(Filter)\n\t\tfor Key, Value in ValidChanges do\n\t\t\tUpdated[Key] = Value\n\t\tend\n\t\tUpdated = Validate(Updated, CallFilterSchema.Filter, \"Invalid updated call filter\")\n\n\t\tlocal Index = table.find(self.Items, Filter)\n\t\tif Index then\n\t\t\tself.Items[Index] = Updated\n\t\tend\n\t\tself.ById[Id] = Updated\n\n\t\tEmitChanged()\n\t\treturn CopyFilter(Updated)\n\tend\n\n\tfunction CallFilters:SetEnabled(Id: string, Enabled: boolean)\n\t\treturn self:Update(Id, { Enabled = Enabled })\n\tend\n\n\tfunction CallFilters:Remove(Id: string): boolean\n\t\tlocal Filter = self.ById[Id]\n\t\tif not Filter then\n\t\t\treturn false\n\t\tend\n\n\t\tself.ById[Id] = nil\n\t\tlocal Index = table.find(self.Items, Filter)\n\t\tif Index then\n\t\t\ttable.remove(self.Items, Index)\n\t\tend\n\t\tEmitChanged()\n\t\treturn true\n\tend\n\n\tfunction CallFilters:ReplaceAll(Filters, Silent: boolean?)\n\t\tlocal Validated = Validate(Filters or {}, Validation.Schema.array(CallFilterSchema.Filter), \"Invalid call filters\")\n\t\tlocal SeenIds = {}\n\t\tfor _, Filter in Validated do\n\t\t\tFilter.Id = Filter.Id or wax.shared.HttpService:GenerateGUID(false)\n\t\t\tassert(not SeenIds[Filter.Id], `A call filter with id {Filter.Id} already exists`)\n\t\t\tSeenIds[Filter.Id] = true\n\t\tend\n\n\t\ttable.clear(self.Items)\n\t\ttable.clear(self.ById)\n\t\tfor _, Filter in Validated do\n\t\t\ttable.insert(self.Items, Filter)\n\t\t\tself.ById[Filter.Id] = Filter\n\t\tend\n\n\t\tif not Silent then\n\t\t\tEmitChanged()\n\t\tend\n\tend\n\n\tfunction CallFilters:Subscribe(Listener)\n\t\tself.Listeners[Listener] = true\n\t\tListener(self:GetAll())\n\n\t\tlocal Subscription = {}\n\t\tfunction Subscription:Disconnect()\n\t\t\tCallFilters.Listeners[Listener] = nil\n\t\tend\n\t\treturn Subscription\n\tend\n\n\tfunction CallFilters:Match(Remote: Instance, Direction: string, Arguments)\n\t\tlocal WinningAction\n\t\tlocal WinningFilter\n\t\tlocal WinningPriority = 0\n\n\t\tfor _, Filter in self.Items do\n\t\t\tlocal TargetMatches = if Filter.Target.Type == \"Instance\"\n\t\t\t\tthen InstanceSerializer.IsEqualToInstance(Filter.Target.Remote, Remote)\n\t\t\t\telse RemoteFields.Matches(Filter.Target.Conditions, Remote)\n\t\t\tif\n\t\t\t\tFilter.Enabled\n\t\t\t\tand (Filter.Direction == \"Any\" or Filter.Direction == Direction)\n\t\t\t\tand TargetMatches\n\t\t\t\tand Operators.MatchesConditions(Filter.Conditions, Arguments)\n\t\t\tthen\n\t\t\t\tlocal Priority = ActionPriorities[Filter.Action] or 0\n\t\t\t\tif Priority > WinningPriority then\n\t\t\t\t\tWinningAction = Filter.Action\n\t\t\t\t\tWinningFilter = Filter\n\t\t\t\t\tWinningPriority = Priority\n\t\t\t\tend\n\t\t\tend\n\t\tend\n\n\t\treturn WinningAction, WinningFilter and CopyFilter(WinningFilter) or nil\n\tend\n\n\tfunction CallFilters:Resolve(Remote: Instance, Direction: string, Info)\n\t\tlocal Action, Filter = self:Match(Remote, Direction, Info.Arguments or {})\n\t\tif Action == \"Highlight\" then\n\t\t\tInfo.Highlighted = true\n\t\t\tInfo.CallFilterId = Filter.Id\n\t\telseif Action then\n\t\t\tInfo.CallFilterId = Filter.Id\n\t\tend\n\t\treturn Action, Filter\n\tend\n\n\twax.shared.CallFilters = CallFilters\nend\n--#endregion\n\n--#region @include region IsPlayerModule\nwax.shared.IsPlayerModule = function(Origin: LocalScript | ModuleScript, Instance: Instance): boolean\n\tif Instance and Instance.ClassName ~= \"BindableEvent\" then\n\t\treturn false\n\tend\n\n\tif not Origin or typeof(Origin) ~= \"Instance\" or not Origin.IsA(Origin, \"LuaSourceContainer\") then\n\t\treturn false\n\tend\n\n\tlocal PlayerModule = Origin and Origin.FindFirstAncestor(Origin, \"PlayerModule\") or nil\n\tif not PlayerModule then\n\t\treturn false\n\tend\n\n\tif PlayerModule.Parent == nil then\n\t\treturn true\n\tend\n\n\tif wax.shared.PlayerScripts then\n\t\treturn compareinstances(PlayerModule.Parent, wax.shared.PlayerScripts)\n\tend\n\n\treturn false\nend\nwax.shared.ShouldIgnore = function(Instance, Origin)\n\tif not wax.shared.Settings.LogRobloxInternalEvents.Value then\n\t\tif Instance.IsDescendantOf(Instance, wax.shared.RobloxReplicatedStorage) then\n\t\t\treturn true\n\t\tend\n\tend\n\n\treturn wax.shared.Settings.IgnoredRemotesDropdown.Value[Instance.ClassName] == true\n\t\tor (wax.shared.Settings.IgnorePlayerModule.Value and wax.shared.IsPlayerModule(Origin, Instance))\nend\n--#endregion\n\n--#region @include \"Src/Utils/Log.luau\" as \"wax.shared.Log\"\ndo\n\tlocal Log = {}\n\tLog.__index = Log\n\n\tlocal PendingCallDecisions = setmetatable({}, { __mode = \"k\" })\n\n\t--// Log Call Queue \\\\--\n\twax.shared.LogNotificationQueue = {\n\t\tItems = {},\n\t\tHead = 1,\n\t\tTail = 0,\n\t}\n\n\tlocal function QueueNotification(LogObject, CallIndex: number)\n\t\tlocal Queue = wax.shared.LogNotificationQueue\n\t\tQueue.Tail += 1\n\t\tQueue.Items[Queue.Tail] = {\n\t\t\tInstance = LogObject.Instance,\n\t\t\tType = LogObject.Type,\n\t\t\tLogIndex = LogObject.Index,\n\t\t\tCallIndex = CallIndex,\n\t\t}\n\tend\n\n\t--// Auto Ignore Constants \\\\--\n\tlocal SpamCallCountThreshold = 15\n\tlocal SpamTimeWindowSeconds = 1\n\tlocal AutoIgnoreSpammyEvents = false\n\n\tif not wax.shared.IS_ACTOR then\n\t\twax.shared.Connect(wax.shared.RunService.Heartbeat:Connect(function()\n\t\t\tlocal Queue = wax.shared.LogNotificationQueue\n\t\t\tlocal Tail = Queue.Tail\n\n\t\t\tif Queue.Head > Tail then\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal Batch = {}\n\t\t\tlocal BatchSize = 0\n\t\t\twhile Queue.Head <= Tail do\n\t\t\t\tlocal Notification = Queue.Items[Queue.Head]\n\t\t\t\tQueue.Items[Queue.Head] = nil\n\t\t\t\tQueue.Head += 1\n\n\t\t\t\tif Notification then\n\t\t\t\t\tBatchSize += 1\n\t\t\t\t\tBatch[BatchSize] = Notification\n\t\t\t\tend\n\t\t\tend\n\n\t\t\ttable.clear(Queue.Items)\n\t\t\tQueue.Head = 1\n\t\t\tQueue.Tail = 0\n\n\t\t\tif BatchSize > 0 then\n\t\t\t\tlocal Communicator = wax.shared.Communicator\n\t\t\t\tif Communicator then\n\t\t\t\t\tAutoIgnoreSpammyEvents = wax.shared.SaveManager:GetState(\"AutoIgnoreSpammyEvents\", false)\n\t\t\t\t\tCommunicator:Fire(Batch)\n\t\t\t\tend\n\n\t\t\t\ttable.clear(Batch)\n\t\t\tend\n\t\tend))\n\tend\n\n\t--// Actor Table Fixing \\\\--\n\tlocal FunctionToMetatadata, FixTable\n\tdo\n\t\tif wax.shared.IS_ACTOR then\n\t\t\tlocal FunctionMetadataCache = setmetatable({}, { __mode = \"k\" })\n\n\t\t\tlocal function CreateTraversalState(Refs)\n\t\t\t\treturn {\n\t\t\t\t\tCyclicRefs = Refs or {},\n\t\t\t\t\tTableIds = setmetatable({}, { __mode = \"k\" }),\n\t\t\t\t\tFunctions = setmetatable({}, { __mode = \"k\" }),\n\t\t\t\t\tNextId = 0,\n\t\t\t\t}\n\t\t\tend\n\n\t\t\tlocal function GenerateId(State)\n\t\t\t\tState.NextId += 1\n\t\t\t\treturn State.NextId\n\t\t\tend\n\n\t\t\tFixTable = function(Table, State)\n\t\t\t\tif not Table then\n\t\t\t\t\treturn nil\n\t\t\t\tend\n\n\t\t\t\tif not State or not State.CyclicRefs then\n\t\t\t\t\tState = CreateTraversalState(State)\n\t\t\t\tend\n\n\t\t\t\tlocal CyclicRefs = State.CyclicRefs\n\t\t\t\tlocal TableId = State.TableIds[Table]\n\t\t\t\tif not TableId then\n\t\t\t\t\tTableId = GenerateId(State)\n\t\t\t\t\tState.TableIds[Table] = TableId\n\t\t\t\tend\n\n\t\t\t\tlocal OutputTable = {}\n\t\t\t\tCyclicRefs[TableId] = OutputTable\n\n\t\t\t\tlocal ContainsCyclicRef = false\n\n\t\t\t\tfor Key, Value in next, Table do\n\t\t\t\t\tif type(Value) == \"table\" then\n\t\t\t\t\t\tlocal ExistingId = State.TableIds[Value]\n\t\t\t\t\t\tif ExistingId then\n\t\t\t\t\t\t\tContainsCyclicRef = true\n\n\t\t\t\t\t\t\tOutputTable[Key] = {\n\t\t\t\t\t\t\t\t__CyclicRef = true,\n\t\t\t\t\t\t\t\t__Id = ExistingId,\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tcontinue\n\t\t\t\t\t\tend\n\n\t\t\t\t\t\tif getmetatable(Value) then\n\t\t\t\t\t\t\tOutputTable[Key] =\n\t\t\t\t\t\t\t\t\"RobloxPL: Impossible to bridge table with metatable from actor Environment to main Environment\"\n\t\t\t\t\t\t\tcontinue\n\t\t\t\t\t\tend\n\n\t\t\t\t\t\tlocal Result, _, ContainsCyclic = FixTable(Value, State)\n\t\t\t\t\t\tif not Result then\n\t\t\t\t\t\t\tcontinue\n\t\t\t\t\t\tend\n\n\t\t\t\t\t\tOutputTable[Key] = Result\n\t\t\t\t\t\tContainsCyclicRef = ContainsCyclicRef or ContainsCyclic\n\t\t\t\t\telseif type(Value) == \"function\" then\n\t\t\t\t\t\tOutputTable[Key] = FunctionToMetatadata(Value, State)\n\t\t\t\t\telse\n\t\t\t\t\t\tOutputTable[Key] = Value\n\t\t\t\t\tend\n\t\t\t\tend\n\n\t\t\t\treturn OutputTable, CyclicRefs, ContainsCyclicRef\n\t\t\tend\n\n\t\t\tFunctionToMetatadata = function(Function, State)\n\t\t\t\tif not Function then\n\t\t\t\t\treturn nil\n\t\t\t\tend\n\n\t\t\t\tif not State or not State.CyclicRefs then\n\t\t\t\t\tState = CreateTraversalState()\n\t\t\t\tend\n\n\t\t\t\tlocal CachedMetadata = FunctionMetadataCache[Function]\n\t\t\t\tif CachedMetadata then\n\t\t\t\t\treturn CachedMetadata\n\t\t\t\tend\n\n\t\t\t\tlocal Metadata = {\n\t\t\t\t\tAddress = tostring(Function),\n\t\t\t\t\tName = debug.info(Function, \"n\"),\n\t\t\t\t\tSource = debug.info(Function, \"s\"),\n\t\t\t\t\tIsC = iscclosure(Function),\n\t\t\t\t}\n\n\t\t\t\tif State.Functions[Function] then\n\t\t\t\t\tMetadata[\"Recursive\"] = true\n\t\t\t\t\tMetadata[\"Validation\"] = Data.Token\n\t\t\t\t\tMetadata[\"__Function\"] = true\n\n\t\t\t\t\treturn Metadata\n\t\t\t\tend\n\n\t\t\t\tState.Functions[Function] = true\n\n\t\t\t\tif not iscclosure(Function) then\n\t\t\t\t\tMetadata[\"Upvalues\"] = debug.getupvalues and #debug.getupvalues(Function) or 0\n\t\t\t\t\tMetadata[\"Constants\"] = debug.getconstants and #debug.getconstants(Function) or 0\n\t\t\t\t\tMetadata[\"Protos\"] = debug.getprotos and #debug.getprotos(Function) or 0\n\n\t\t\t\t\tif getfunctionhash then\n\t\t\t\t\t\tMetadata[\"FunctionHash\"] = getfunctionhash(Function)\n\t\t\t\t\tend\n\t\t\t\tend\n\n\t\t\t\t-- to validate that this function was generated by FunctionToMetatadata\n\t\t\t\tMetadata[\"Validation\"] = Data.Token\n\t\t\t\tMetadata[\"__Function\"] = true\n\n\t\t\t\tFunctionMetadataCache[Function] = Metadata\n\n\t\t\t\treturn Metadata\n\t\t\tend\n\t\tend\n\tend\n\n\t--// Cloning \\\\--\n\tfunction DeepClone(OriginalValue, ValueCopies)\n\t\tif wax.shared.IS_ACTOR then\n\t\t\treturn OriginalValue\n\t\tend\n\n\t\tlocal OriginalType = type(OriginalValue)\n\t\tif OriginalType ~= \"table\" then\n\t\t\tif OriginalType == \"string\" or OriginalType == \"number\" or OriginalType == \"boolean\" or OriginalValue == nil then\n\t\t\t\treturn OriginalValue\n\t\t\tend\n\n\t\t\tlocal RobloxType = typeof(OriginalValue)\n\t\t\tif RobloxType == \"Instance\" then\n\t\t\t\treturn cloneref(OriginalValue)\n\t\t\n\t\t\telseif RobloxType == \"userdata\" then\n\t\t\t\tif getmetatable(OriginalValue) then\n\t\t\t\t\treturn newproxy(true)\n\t\t\t\telse\n\t\t\t\t\treturn newproxy()\n\t\t\t\tend\n\n\t\t\telseif RobloxType == \"function\" then\n\t\t\t\tif clonefunction then\n\t\t\t\t\treturn clonefunction(OriginalValue)\n\t\t\t\telse\n\t\t\t\t\treturn OriginalValue\n\t\t\t\tend\n\t\t\tend\n\n\t\t\treturn OriginalValue\n\t\tend\n\n\t\t-- Cycle detection\n\t\tif ValueCopies then\n\t\t\tlocal CachedValue = ValueCopies[OriginalValue]\n\t\t\tif CachedValue then\n\t\t\t\treturn CachedValue\n\t\t\tend\n\t\telse\n\t\t\tValueCopies = {}\n\t\tend\n\n\t\t-- Shallow copy first, then selectively recurse\n\t\tlocal ShallowCopy = table.create(rawlen(OriginalValue))\n\t\tValueCopies[OriginalValue] = ShallowCopy\n\n\t\tfor Key, Value in next, OriginalValue do\n\t\t\tlocal ValueType = type(Value)\n\n\t\t\tif ValueType == \"table\" then\n\t\t\t\tShallowCopy[Key] = DeepClone(Value, ValueCopies)\n\n\t\t\telseif ValueType == \"userdata\" then\n\t\t\t\tlocal ValueRobloxType = typeof(Value)\n\n\t\t\t\tif ValueRobloxType == \"Instance\" then\n\t\t\t\t\tShallowCopy[Key] = cloneref(Value)\n\n\t\t\t\telseif ValueRobloxType == \"userdata\" then\n\t\t\t\t\tif getmetatable(Value) then\n\t\t\t\t\t\tShallowCopy[Key] = newproxy(true)\n\t\t\t\t\telse\n\t\t\t\t\t\tShallowCopy[Key] = newproxy()\n\t\t\t\t\tend\n\n\t\t\t\telse\n\t\t\t\t\tShallowCopy[Key] = Value\n\t\t\t\tend\n\n\t\t\telseif ValueType == \"function\" then\n\t\t\t\tif clonefunction then\n\t\t\t\t\tShallowCopy[Key] = clonefunction(Value)\n\t\t\t\telse\n\t\t\t\t\tShallowCopy[Key] = Value\n\t\t\t\tend\n\t\t\n\t\t\telse\n\t\t\t\tShallowCopy[Key] = Value\n\t\t\tend\n\t\tend\n\n\t\treturn ShallowCopy\n\tend\n\n\tif wax.shared.IS_ACTOR then\n\t\twax.shared.SerializeActorInfo = function(Info)\n\t\t\treturn FixTable(DeepClone(Info))\n\t\tend\n\tend\n\n\tfunction Log.new(Instance, Type, Index, CallingScript)\n\t\tlocal NewLog = setmetatable({\n\t\t\tInstance = Instance,\n\t\t\tType = Type,\n\t\t\tIndex = Index,\n\t\t\tCalls = {},\n\t\t\tGameCalls = {},\n\t\t\tSpamWindowStart = 0,\n\t\t\tSpamCallCount = 0,\n\t\t\tIgnored = false,\n\t\t\tBlocked = false,\n\t\t\tButton = nil,\n\t\t}, Log)\n\n\t\treturn NewLog\n\tend\n\n\tfunction Log:IsOverSpamThreshold()\n\t\tif not AutoIgnoreSpammyEvents then\n\t\t\treturn false\n\t\tend\n\n\t\tlocal Now = tick()\n\t\tif Now - self.SpamWindowStart > SpamTimeWindowSeconds then\n\t\t\tself.SpamWindowStart = Now\n\t\t\tself.SpamCallCount = 0\n\t\tend\n\n\t\tself.SpamCallCount = self.SpamCallCount + 1\n\n\t\tif self.SpamCallCount > SpamCallCountThreshold then\n\t\t\tif not self.Ignored then\n\t\t\t\tself.Ignore(self)\n\t\t\t\twax.shared.Sonner.info(`Ignored {self.Instance.Name} ({self.Type}) due to event spam.`)\n\t\t\tend\n\n\t\t\treturn true\n\t\tend\n\n\t\treturn false\n\tend\n\n\tlocal function RunInterceptors(Interceptors: { (...any) -> ...any }, Info: any, Log): boolean\n\t\tfor _, Callback in Interceptors do\n\t\t\tlocal Ok, Result = pcall(Callback, Info, Log.Instance, Log.Type)\n\t\t\tif not Ok then\n\t\t\t\twarn(`[RobloxPL Plugin Interceptor] Error: {Result}`)\n\t\t\telseif Result == false then\n\t\t\t\treturn true\n\t\t\tend\n\t\tend\n\n\t\treturn false\n\tend\n\n\tfunction Log:ShouldBlock(RawInfo, PendingCallDecisionsKey): boolean\n\t\tPendingCallDecisionsKey = PendingCallDecisionsKey or tostring(RawInfo)\n\n\t\tlocal Decision = PendingCallDecisions[PendingCallDecisionsKey]\n\t\tif Decision then\n\t\t\treturn Decision.ShouldBlock\n\t\tend\n\n\t\tlocal FilterAction\n\t\tlocal CallFilters = wax.shared.CallFilters\n\t\tdo\n\t\t\tif CallFilters then\n\t\t\t\tFilterAction = CallFilters:Resolve(self.Instance, self.Type, RawInfo)\n\t\t\tend\n\t\tend\n\n\t\tlocal ShouldBlock = RawInfo.Blocked == true or self.Blocked or FilterAction == \"Block\"\n\t\tif ShouldBlock then\n\t\t\tRawInfo.Blocked = true\n\t\tend\n\n\t\tPendingCallDecisions[PendingCallDecisionsKey] = {\n\t\t\tFilterAction = FilterAction,\n\t\t\tShouldBlock = ShouldBlock,\n\t\t}\n\t\treturn ShouldBlock\n\tend\n\n\tfunction Log:Call(RawInfo): number?\n\t\tlocal PendingCallDecisionsKey = tostring(RawInfo)\n\n\t\tlocal ShouldBlock = self:ShouldBlock(RawInfo, PendingCallDecisionsKey)\n\t\tlocal Decision = PendingCallDecisions[PendingCallDecisionsKey]\n\t\tPendingCallDecisions[PendingCallDecisionsKey] = nil\n\n\t\tlocal ShouldCapture = not self.Ignored and Decision.FilterAction ~= \"Ignore\"\n\t\tdo\n\t\t\tif ShouldBlock then\n\t\t\t\tShouldCapture = ShouldCapture and wax.shared.SaveManager:GetState(\"LogBlockedRemotes\", false)\n\t\t\tend\n\n\t\t\tif RawInfo.Omit then\n\t\t\t\tShouldCapture = false\n\t\t\tend\n\t\tend\n\n\t\tif not ShouldCapture then\n\t\t\treturn nil\n\t\tend\n\n\t\t--// Ratelimiting \\\\--\n\t\tif not wax.shared.IS_ACTOR then\n\t\t\tlocal Success, SpamData = pcall(function() return self.IsOverSpamThreshold(self) end)\n\t\t\tif Success and SpamData then\n\t\t\t\treturn nil\n\t\t\tend\n\t\tend\n\n\t\t--// Info stuff \\\\--\n\t\tlocal Info = DeepClone(RawInfo)\n\t\tInfo.CreationTime = tick()\n\n\t\t--// Actor Relaying \\\\--\n\t\tif wax.shared.IS_ACTOR then\n\t\t\tif self.Instance == wax.shared.Communicator then\n\t\t\t\treturn nil\n\t\t\tend\n\n\t\t\tInfo[\"Actor\"] = CurrentActor\n\n\t\t\t--// Fix Arguments \\\\--\n\t\t\tlocal OldArguments = Info.Arguments\n\t\t\tInfo.Arguments = {\n\t\t\t\tData = OldArguments,\n\t\t\t\tn = OldArguments.n,\n\t\t\t}\n\n\t\t\tif Info.InvokeResult then\n\t\t\t\tlocal OldInvokeResult = Info.InvokeResult\n\t\t\t\tInfo.InvokeResult = {\n\t\t\t\t\tData = OldInvokeResult,\n\t\t\t\t\tn = OldInvokeResult.n,\n\t\t\t\t}\n\t\t\tend\n\n\t\t\tlocal FixedInfo, CyclicRefs, ContainsCyclicRef = FixTable(Info)\n\n\t\t\t-- Seliware puts their actor BindableEvents in CoreGui\n\t\t\tlocal identity = getthreadidentity()\n\t\t\tsetthreadidentity(8)\n\t\t\twax.shared.Communicator.Fire(\n\t\t\t\twax.shared.Communicator,\n\t\t\t\t\"ActorCall\",\n\t\t\t\tself.Instance,\n\t\t\t\tself.Type,\n\t\t\t\tFixedInfo,\n\t\t\t\tCyclicRefs,\n\t\t\t\tContainsCyclicRef\n\t\t\t)\n\t\t\tsetthreadidentity(identity)\n\t\t\treturn nil\n\t\tend\n\n\t\t--// Plugin Interceptors \\\\--\n\t\tlocal PluginManager = wax.shared.RobloxPLPluginManager\n\t\tif PluginManager and PluginManager.HasInterceptors then\n\t\t\t-- Run Instance-specific interceptors (both exact type and \"All\")\n\t\t\tlocal InstanceIntercept = PluginManager.Registry.Interceptors.Instance[self.Instance]\n\t\t\tif InstanceIntercept then\n\t\t\t\tif InstanceIntercept[self.Type] and RunInterceptors(InstanceIntercept[self.Type], Info, self) then\n\t\t\t\t\treturn nil\n\t\t\t\tend\n\t\t\t\tif InstanceIntercept[\"All\"] and RunInterceptors(InstanceIntercept[\"All\"], Info, self) then\n\t\t\t\t\treturn nil\n\t\t\t\tend\n\t\t\tend\n\n\t\t\t-- Run Global interceptors (both exact type and \"All\")\n\t\t\tlocal GlobalByType = PluginManager.Registry.Interceptors.Global[self.Type]\n\t\t\tif GlobalByType and RunInterceptors(GlobalByType, Info, self) then\n\t\t\t\treturn nil\n\t\t\tend\n\n\t\t\tlocal GlobalAll = PluginManager.Registry.Interceptors.Global[\"All\"]\n\t\t\tif GlobalAll and RunInterceptors(GlobalAll, Info, self) then\n\t\t\t\treturn nil\n\t\t\tend\n\t\tend\n\n\t\t--// Update Log \\\\--\n\t\tlocal Index = #self.Calls + 1\n\t\tself.Calls[Index] = Info\n\t\tif not Info.IsExecutor then\n\t\t\ttable.insert(self.GameCalls, Index)\n\t\tend\n\n\t\tQueueNotification(self, Index)\n\t\treturn Index\n\tend\n\n\tfunction Log:ClearCalls()\n\t\ttable.clear(self.Calls)\n\t\ttable.clear(self.GameCalls)\n\tend\n\n\tfunction Log:Ignore()\n\t\tself.Ignored = not self.Ignored\n\n\t\tif not wax.shared.IS_ACTOR then\n\t\t\tif wax.shared.ActorCommunicator then\n\t\t\t\tpcall(wax.shared.ActorCommunicator.Fire, wax.shared.ActorCommunicator, \"MainIgnore\", self.Instance, self.Type)\n\t\t\tend\n\n\t\t\tlocal IgnoredRemoteList = wax.shared.Settings[\"IgnoredRemotes\"]\n\t\t\tif IgnoredRemoteList then\n\t\t\t\tif self.Ignored then\n\t\t\t\t\tIgnoredRemoteList:AddToList(self)\n\t\t\t\telse\n\t\t\t\t\tIgnoredRemoteList:RemoveFromList(self)\n\t\t\t\tend\n\t\t\tend\n\t\tend\n\tend\n\n\tlocal ClassesConnectionsToggle = {\n\t\tRemoteEvent = \"OnClientEvent\",\n\t\tUnreliableRemoteEvent = \"OnClientEvent\",\n\t\tBindableEvent = \"Event\",\n\t}\n\n\tfunction Log:SetConnectionsEnabled(enabled: boolean)\n\t\tif not self.Instance or not ClassesConnectionsToggle[self.Instance.ClassName] then\n\t\t\treturn\n\t\tend\n\n\t\tlocal ConnectionName = ClassesConnectionsToggle[self.Instance.ClassName]\n\t\tif self.Type ~= \"Incoming\" or not ConnectionName then\n\t\t\treturn\n\t\tend\n\n\t\tlocal LoggingFunctions = wax.shared.IncomingLogConnectionFunctions\n\t\tfor _, Connection in pairs(getconnections(self.Instance[ConnectionName])) do\n\t\t\tif LoggingFunctions and LoggingFunctions[Connection.Function] then\n\t\t\t\tcontinue\n\t\t\tend\n\n\t\t\tif enabled then\n\t\t\t\tConnection:Enable()\n\t\t\telse\n\t\t\t\tConnection:Disable()\n\t\t\tend\n\t\tend\n\tend\n\n\tfunction Log:Block()\n\t\tif not wax.shared.IS_ACTOR and wax.shared.ActorCommunicator then\n\t\t\tpcall(wax.shared.ActorCommunicator.Fire, wax.shared.ActorCommunicator, \"MainBlock\", self.Instance, self.Type)\n\t\tend\n\n\t\tself.Blocked = not self.Blocked\n\t\tself:SetConnectionsEnabled(not self.Blocked)\n\tend\n\n\tfunction Log:SetButton(Instance, Name, Calls)\n\t\tself.Button = {\n\t\t\tInstance = Instance,\n\t\t\tName = Name,\n\t\t\tCalls = Calls,\n\t\t}\n\tend\n\n\twax.shared.Log = Log\nend\n--#endregion\n\n--#region @include \"Src/Spy/Hooks/Luau/Interceptors/Incoming.luau\" as \"wax.shared.IncomingInterceptor\"\ndo\n\t--// Helpers \\\\--\n\tlocal function CreateLookupTable(table)\n\t\tlocal LookupTable = {}\n\t\tfor _, Method in next, table do\n\t\t\tLookupTable[Method] = true\n\t\tend\n\t\treturn LookupTable\n\tend\n\n\t--// Variables \\\\--\n\tlocal setfenv = setfenv\n\tlocal getconnections = wax.shared.ExecutorSupport[\"getconnections\"].IsWorking and getconnections or function() return {} end\n\n\tlocal ClassesToHook = {\n\t\tRemoteEvent = \"OnClientEvent\",\n\t\tRemoteFunction = \"OnClientInvoke\",\n\t\tUnreliableRemoteEvent = \"OnClientEvent\",\n\t\tBindableEvent = \"Event\",\n\t\tBindableFunction = \"OnInvoke\",\n\t}\n\n\tlocal ConnectionKeys = CreateLookupTable({\n\t\t\"Connect\",\n\t\t\"ConnectParallel\",\n\t\t\"connect\",\n\t\t\"connectParallel\",\n\t\t\"Once\",\n\t})\n\n\t--// State \\\\--\n\tlocal ConnectionsEnabled = false\n\tlocal CallbacksEnabled = false\n\tlocal ConnectionHookEnabled = false\n\n\t--// Signals & Detours \\\\--\n\tlocal LogConnectionFunctions = {}\n\tlocal CallbackOwners = setmetatable({}, { __mode = \"k\" })\n\tlocal SignalMapping = setmetatable({}, { __mode = \"kv\" })\n\tlocal ObservedConnectionInstances = setmetatable({}, { __mode = \"k\" })\n\twax.shared.IncomingLogConnectionFunctions = LogConnectionFunctions\n\n\tlocal RobloxPLObserverEnvironmentKey = \"__RobloxPLIncomingObserver\"\n\n\t--// Types \\\\--\n\ttype InstancesToHook = RemoteEvent | UnreliableRemoteEvent | RemoteFunction | BindableEvent | BindableFunction\n\ttype MethodsToHook = \"OnClientEvent\" | \"OnClientInvoke\" | \"Event\" | \"OnInvoke\"\n\texport type Options = {\n\t\tConnections: boolean?,\n\t\tCallbacks: boolean?,\n\t\tHookConnections: boolean?,\n\t}\n\n\t--// Functions \\\\--\n\tlocal function GetLog(Instance: InstancesToHook, Function: (...any) -> ...any)\n\t\tlocal DebugId = wax.shared.GetDebugId(Instance)\n\n\t\tif wax.shared.ShouldIgnore(Instance, getcallingscript()) or LogConnectionFunctions[Function] then\n\t\t\treturn nil\n\t\tend\n\n\t\tlocal IncomingLogs = wax.shared.Logs.Incoming\n\t\tif not IncomingLogs then\n\t\t\treturn nil\n\t\tend\n\n\t\tlocal Log = IncomingLogs[DebugId]\n\t\tif not Log then\n\t\t\tLog = wax.shared.NewLog(Instance, \"Incoming\", getcallingscript(), DebugId)\n\t\tend\n\n\t\treturn Log\n\tend\n\n\tlocal function ResolveCallableFunction(Value: any): ((...any) -> ...any)?\n\t\tif typeof(Value) == \"function\" then\n\t\t\treturn Value\n\t\tend\n\n\t\tlocal Success, Metatable = pcall(wax.shared.getrawmetatable, Value)\n\t\tif not Success or not Metatable then\n\t\t\treturn nil\n\t\tend\n\n\t\tlocal HasCall, Call = pcall(rawget, Metatable, \"__call\")\n\t\treturn if HasCall and typeof(Call) == \"function\" then Call else nil\n\tend\n\n\t--[[\n\t\tIndividually logs an incoming remote call.\n\n\t\t@param Instance The instance that was called.\n\t\t@param Function The function that was called, if applicable.\n\t\t@param Info The information about the call, including arguments and origin. Can be nil.\n\t\t@param ... The arguments passed from the server to the client.\n\t\t@return boolean, Log? Returns true if the call was blocked, plus the log when one was used.\n\t]]\n\tlocal function LogRemote(\n\t\tInstance: InstancesToHook,\n\t\tFunction: (...any) -> ...any,\n\t\tInfo: {\n\t\t\tArguments: { [number]: any, n: number },\n\t\t\tOrigin: Instance,\n\t\t\tFunction: (...any) -> ...any,\n\t\t\tLine: number,\n\t\t\tIsExecutor: boolean,\n\t\t\tBlocked: boolean?,\n\t\t}\n\t)\n\t\tlocal Log = GetLog(Instance, Function)\n\t\tif not Log then\n\t\t\treturn false, nil\n\t\tend\n\n\t\tlocal ShouldBlock = Log:ShouldBlock(Info)\n\t\tlocal CallIndex = Log:Call(Info)\n\t\treturn ShouldBlock, Log, CallIndex\n\tend\n\n\t--#region Hook Filters\n\tlocal SupportsFilters = wax.shared.ExecutorSupport[\"FilterBase\"].IsWorking\n\n\t--[[\n\t\tCreates a base filter for the incoming hooks.\n\n\t\t@return `table` The base filter.\n\t]]\n\tlocal function CreateBaseFilter()\n\t\tlocal Filters = {}\n\t\tif not SupportsFilters then\n\t\t\treturn Filters\n\t\tend\n\n\t\t--// allowed classnames \\\\--\n\t\tfor ClassName in ClassesToHook do\n\t\t\ttable.insert(Filters, InstanceTypeFilter.new(1, ClassName))\n\t\tend\n\n\t\treturn Filters\n\tend\n\t--#endregion\n\n\t--#region Incoming Connection Stuff\n\tlocal function IsRobloxPLConnectionFunction(Function): boolean\n\t\tif not Function then\n\t\t\treturn false\n\t\tend\n\n\t\tif LogConnectionFunctions[Function] then\n\t\t\treturn true\n\t\tend\n\n\t\tlocal Success, Environment = pcall(getfenv, Function)\n\t\tlocal VerificationToken = wax.shared.RobloxPLVerificationToken\n\t\treturn (\n\t\t\tSuccess\n\t\t\tand VerificationToken ~= nil\n\t\t\tand typeof(Environment) == \"table\"\n\t\t\tand rawequal(rawget(Environment, RobloxPLObserverEnvironmentKey), VerificationToken)\n\t\t)\n\tend\n\n\t--[[\n\t\tCreates a function that can be used to pass to `Connect` which will log all the incoming calls. It will additonally add the function to a ignore list (`LogConnectionFunctions`) to prevent unneccessary logging.\n\t\t\n\t\t@param Instance The instance to log.\n\t\t@param Method The method to log (e.g., \"OnClientEvent\").\n\t\t@return function Returns a function that logs all calls to the given instance and method.\n\t]]\n\tlocal function CreateConnectionFunction(Instance: InstancesToHook, Method: MethodsToHook)\n\t\tlocal CachedConnectionInfo = nil\n\t\tlocal CachedConnectionCount = -1\n\n\t\tlocal DebugId = wax.shared.GetDebugId(Instance)\n\n\t\tlocal ConnectionFunction = function(...)\n\t\t\t--// Skip if this remote is already ignored \\\\--\n\t\t\tlocal ExistingLog = wax.shared.Logs.Incoming[DebugId]\n\t\t\tif ExistingLog and ExistingLog.Ignored then\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal Signal = (Instance :: any)[Method]\n\t\t\tlocal Connections = getconnections(Signal)\n\t\t\tlocal ConnectionCount = #Connections\n\n\t\t\t-- Only re-analyze connections when the count changes (connect/disconnect)\n\t\t\tif ConnectionCount ~= CachedConnectionCount then\n\t\t\t\tCachedConnectionCount = ConnectionCount\n\n\t\t\t\tlocal Information = {\n\t\t\t\t\tHasValidConnections = false,\n\t\t\t\t\tHasForeignLuaConnections = false,\n\t\t\t\t\tEntries = {},\n\t\t\t\t}\n\n\t\t\t\tfor _, Connection in Connections do\n\t\t\t\t\t--// Foreign State Connections \\\\--\n\t\t\t\t\tif Connection.ForeignState then\n\t\t\t\t\t\t--// It is a Lua Connection - Other Actor's Connections \\\\--\n\t\t\t\t\t\tif Connection.LuaConnection then\n\t\t\t\t\t\t\tInformation.HasForeignLuaConnections = true\n\t\t\t\t\t\tend\n\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tend\n\n\t\t\t\t\t--// Get Function \\\\--\n\t\t\t\t\tlocal Function = typeof(Connection.Function) == \"function\" and (Connection.Function) or (nil)\n\t\t\t\t\tif IsRobloxPLConnectionFunction(Function) then\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tend\n\n\t\t\t\t\tInformation.HasValidConnections = true\n\n\t\t\t\t\t--// Get Origin \\\\--\n\t\t\t\t\tlocal Thread = Connection.Thread\n\t\t\t\t\tlocal Origin = nil\n\n\t\t\t\t\tif Thread and getscriptfromthread then\n\t\t\t\t\t\tOrigin = getscriptfromthread(Thread)\n\t\t\t\t\tend\n\n\t\t\t\t\tif not Origin and Function then\n\t\t\t\t\t\t-- ts is unreliable because people could js set the script global to nil\n\t\t\t\t\t\t-- if only debug.getinfo(Function).source or debug.info(Function, \"s\") returned an Instance...\n\n\t\t\t\t\t\tlocal Script = rawget(getfenv(Function), \"script\")\n\t\t\t\t\t\tif typeof(Script) == \"Instance\" then\n\t\t\t\t\t\t\tOrigin = Script\n\t\t\t\t\t\tend\n\t\t\t\t\tend\n\n\t\t\t\t\ttable.insert(Information.Entries, {\n\t\t\t\t\t\tFunction = Function,\n\t\t\t\t\t\tOrigin = Origin,\n\t\t\t\t\t\tIsExecutor = Function and isexecutorclosure(Function) or false,\n\t\t\t\t\t})\n\t\t\t\tend\n\n\t\t\t\tCachedConnectionInfo = Information\n\t\t\tend\n\n\t\t\tlocal Arguments = wax.shared.SafePack.Pack(...)\n\t\t\tlocal TargetLog, TargetCallIndex\n\n\t\t\t--// Log Remote \\\\--\n\t\t\tif CachedConnectionInfo.HasValidConnections then\n\t\t\t\tfor _, Entry in CachedConnectionInfo.Entries do\n\t\t\t\t\tTargetLog, TargetCallIndex = select(2, LogRemote(Instance, Entry.Function, {\n\t\t\t\t\t\tArguments = Arguments,\n\t\t\t\t\t\tOrigin = Entry.Origin,\n\t\t\t\t\t\tFunction = Entry.Function,\n\t\t\t\t\t\tLine = nil,\n\t\t\t\t\t\tIsExecutor = Entry.IsExecutor,\n\t\t\t\t\t}))\n\t\t\t\tend\n\n\t\t\telseif not wax.shared.IS_ACTOR then\n\t\t\t\tTargetLog, TargetCallIndex = select(2, LogRemote(Instance, nil, {\n\t\t\t\t\tArguments = Arguments,\n\t\t\t\t\tOrigin = nil,\n\t\t\t\t\tFunction = nil,\n\t\t\t\t\tLine = nil,\n\t\t\t\t\tIsExecutor = false,\n\t\t\t\t}))\n\t\t\tend\n\n\t\t\tlocal Communicator = wax.shared.ActorCommunicator\n\t\t\tif Communicator then\n\t\t\t\tif\n\t\t\t\t\tnot wax.shared.IS_ACTOR\n\t\t\t\t\tand CachedConnectionInfo.HasForeignLuaConnections\n\t\t\t\t\tand TargetLog\n\t\t\t\t\tand TargetCallIndex\n\t\t\t\tthen\n\t\t\t\t\tCommunicator:Fire(\n\t\t\t\t\t\t\"InspectIncomingConnections\",\n\t\t\t\t\t\tInstance,\n\t\t\t\t\t\tMethod,\n\t\t\t\t\t\tTargetLog.Index,\n\t\t\t\t\t\tTargetCallIndex\n\t\t\t\t\t)\n\t\t\t\tend\n\t\t\tend\n\t\tend\n\n\t\tlocal OriginalEnvironment = getfenv(ConnectionFunction)\n\t\tsetfenv(ConnectionFunction, setmetatable({\n\t\t\t[RobloxPLObserverEnvironmentKey] = wax.shared.RobloxPLVerificationToken,\n\t\t}, {\n\t\t\t__index = OriginalEnvironment,\n\t\t\t__newindex = OriginalEnvironment,\n\t\t}))\n\n\t\tLogConnectionFunctions[ConnectionFunction] = true\n\t\treturn ConnectionFunction\n\tend\n\t--#endregion\n\n\t--#region Incoming Callback Stuff\n\t--[[\n\t\tHandles logging for a callback.\n\n\t\t@param Log The log to use.\n\t\t@param Info The pending callback call information.\n\t\t@param InitialEnv The initial environment to use.\n\t\t@param InitialIdentity The initial identity to use.\n\t\t@param ... The result of the callback.\n\n\t\t@return The result of the callback.\n\t]]\n\tlocal function HandleCallbackLogging(Log, Info, InitialEnv, InitialIdentity, ...)\n\t\tsetfenv(0, InitialEnv)\n\t\tsetthreadidentity(InitialIdentity)\n\n\t\tif Log then\n\t\t\tInfo.InvokeResult = wax.shared.SafePack.Pack(...)\n\t\t\tLog:Call(Info)\n\t\tend\n\n\t\treturn ...\n\tend\n\n\t--[[\n\t\tCreates a function that can be used to pass to callbacks (.OnInvoke & .OnClientInvoke) which will log all the incoming calls.\n\t\t\n\t\t@param Instance The instance to log.\n\t\t@param Function The original callback of the RemoteFunction\n\t\t@return function Returns a function that logs all function calls to the given instance.\n\t]]\n\tlocal function CreateCallbackDetour(Instance: InstancesToHook, Callback: any)\n\t\tlocal CallbackFunction = assert(ResolveCallableFunction(Callback), \"Callback is not callable\")\n\t\tlocal Detour = function(...)\n\t\t\tlocal Origin = nil\n\n\t\t\t-- May not exist in all executors\n\t\t\tif getscriptfromthread then\n\t\t\t\tOrigin = getscriptfromthread(coroutine.running())\n\t\t\tend\n\n\t\t\t-- Unreliable method to get script.\n\t\t\tif not Origin then\n\t\t\t\tlocal Script = rawget(getfenv(CallbackFunction), \"script\")\n\t\t\t\tif typeof(Script) == \"Instance\" then\n\t\t\t\t\tOrigin = Script\n\t\t\t\tend\n\t\t\tend\n\n\t\t\tlocal FunctionCaller = debug.info(2, \"f\")\n\t\t\tlocal IsExecutor = if typeof(FunctionCaller) == \"function\"\n\t\t\t\tthen isexecutorclosure(FunctionCaller)\n\t\t\t\telse isexecutorclosure(CallbackFunction)\n\n\t\t\tlocal Arguments = wax.shared.SafePack.Pack(...)\n\t\t\tlocal Log = GetLog(Instance, CallbackFunction)\n\t\t\tlocal Info = {\n\t\t\t\tArguments = Arguments,\n\t\t\t\tOrigin = Origin,\n\t\t\t\tFunction = CallbackFunction,\n\t\t\t\tLine = nil,\n\t\t\t\tIsExecutor = IsExecutor,\n\t\t\t\tInvokeKind = \"Callback\",\n\t\t\t}\n\t\t\tif Log and Log:ShouldBlock(Info) then\n\t\t\t\tLog:Call(Info)\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal InitialEnv, InitialIdentity = getfenv(CreateCallbackDetour), getthreadidentity()\n\t\t\tlocal IsDirectFunction = rawequal(Callback, CallbackFunction)\n\n\t\t\tsetthreadidentity(2)\n\t\t\tsetfenv(0, getfenv(CallbackFunction))\n\t\t\tif IsDirectFunction then\n\t\t\t\treturn HandleCallbackLogging(\n\t\t\t\t\tLog,\n\t\t\t\t\tInfo,\n\t\t\t\t\tInitialEnv,\n\t\t\t\t\tInitialIdentity,\n\t\t\t\t\tCallbackFunction(...)\n\t\t\t\t)\n\t\t\tend\n\n\t\t\treturn HandleCallbackLogging(\n\t\t\t\tLog,\n\t\t\t\tInfo,\n\t\t\t\tInitialEnv,\n\t\t\t\tInitialIdentity,\n\t\t\t\tCallbackFunction(Callback, ...)\n\t\t\t)\n\t\tend\n\n\t\tif wax.shared.ExecutorSupport[\"setstackhidden\"].IsWorking then\n\t\t\tsetstackhidden(Detour, true)\n\t\tend\n\n\t\tCallbackOwners[Detour] = {\n\t\t\tOriginal = Callback,\n\t\t\tMethod = ClassesToHook[Instance.ClassName],\n\t\t\tInstance = Instance\n\t\t}\n\t\treturn Detour\n\tend\n\n\tlocal function GetOriginalScript(OriginalEnv: { [string]: any}): Instance?\n\t\tlocal OriginalScript = rawget(OriginalEnv, \"script\")\n\t\tif typeof(OriginalScript) ~= \"Instance\" then\n\t\t\treturn nil\n\t\tend\n\n\t\treturn OriginalScript\n\tend\n\n\t--[[\n\t\tRestores the callback detours for the given instances. Used for RobloxPL unloading.\n\t\tNOTE: Keep this in here so Actors can rely on wax.shared.RestoreCallbackDetours\n\t]]\n\twax.shared.RestoreCallbackDetours = function()\n\t\tfor Detour, Owner in CallbackOwners do\n\t\t\tlocal Success, CurrentCallback = pcall(getcallbackvalue, Owner.Instance, Owner.Method)\n\t\t\tif not (Success and rawequal(CurrentCallback, Detour)) then\n\t\t\t\tcontinue\n\t\t\tend\n\n\t\t\tpcall(function()\n\t\t\t\tif wax.shared.trampoline_call then\n\t\t\t\t\tlocal OriginalEnv = getfenv(Owner.Original)\n\t\t\t\t\tlocal OriginalScript = GetOriginalScript(OriginalEnv)\n\n\t\t\t\t\twax.shared.trampoline_call(function()\n\t\t\t\t\t\tOwner.Instance[Owner.Method] = Owner.Original\n\t\t\t\t\tend, {}, {\n\t\t\t\t\t\tenv = OriginalEnv,\n\t\t\t\t\t\tscript = OriginalScript,\n\t\t\t\t\t\tidentity = 2\n\t\t\t\t\t})\n\t\t\t\telse\n\t\t\t\t\ttask.spawn(function()\n\t\t\t\t\t\tlocal OriginalEnv = getfenv(Owner.Original)\n\n\t\t\t\t\t\tsetthreadidentity(2)\n\t\t\t\t\t\tsetfenv(0, OriginalEnv)\n\t\t\t\t\t\tOwner.Instance[Owner.Method] = Owner.Original\n\t\t\t\t\tend)\n\t\t\t\tend\n\t\t\tend)\n\t\tend\n\n\t\ttable.clear(CallbackOwners)\n\tend\n\n\t--#endregion\n\n\t--[[\n\t\tHandles setting up logging for the appropriate instances.\n\n\t\t@param Instance The instance to handle.\n\t]]\n\tlocal function HandleInstance(Instance: any)\n\t\tif\n\t\t\tnot ClassesToHook[Instance.ClassName]\n\t\t\tor Instance == wax.shared.Communicator\n\t\t\tor Instance == wax.shared.ActorCommunicator\n\t\tthen\n\t\t\treturn\n\t\tend\n\n\t\tlocal Method = ClassesToHook[Instance.ClassName]\n\n\t\tif ConnectionsEnabled and not ObservedConnectionInstances[Instance] then\n\t\t\tif Instance.ClassName == \"RemoteEvent\" or Instance.ClassName == \"UnreliableRemoteEvent\" then\n\t\t\t\twax.shared.Connect(Instance.OnClientEvent:Connect(CreateConnectionFunction(Instance, Method)))\n\n\t\t\t\tSignalMapping[Instance.OnClientEvent] = Instance\n\t\t\t\tObservedConnectionInstances[Instance] = true\n\t\t\telseif Instance.ClassName == \"BindableEvent\" then\n\t\t\t\twax.shared.Connect(Instance.Event:Connect(CreateConnectionFunction(Instance, Method)))\n\n\t\t\t\tSignalMapping[Instance.Event] = Instance\n\t\t\t\tObservedConnectionInstances[Instance] = true\n\t\t\tend\n\t\tend\n\n\t\tif CallbacksEnabled then\n\t\t\tif Instance.ClassName == \"RemoteFunction\" or Instance.ClassName == \"BindableFunction\" then\n\t\t\t\tlocal IsCoreRemote = Instance:IsDescendantOf(wax.shared.RobloxReplicatedStorage)\n\t\t\t\tif IsCoreRemote then return end\n\n\t\t\t\tlocal Success, Callback = pcall(getcallbackvalue, Instance, Method)\n\t\t\t\tlocal IsCallable = ResolveCallableFunction(Callback) ~= nil\n\n\t\t\t\tif not Success or not IsCallable or CallbackOwners[Callback] then\n\t\t\t\t\treturn\n\t\t\t\tend\n\n\t\t\t\t--// Use trampoline_call so error redirection dosent occur \\\\--\n\t\t\t\tif wax.shared.trampoline_call then\n\t\t\t\t\tlocal OriginalEnv = getfenv(Callback)\n\t\t\t\t\tlocal OriginalScript = GetOriginalScript(OriginalEnv)\n\n\t\t\t\t\twax.shared.trampoline_call(function()\n\t\t\t\t\t\tInstance[Method] = CreateCallbackDetour(Instance, Callback)\n\t\t\t\t\tend, {}, {\n\t\t\t\t\t\tenv = OriginalEnv,\n\t\t\t\t\t\tscript = OriginalScript,\n\t\t\t\t\t\tidentity = 2\n\t\t\t\t\t})\n\t\t\t\telse\n\t\t\t\t\tInstance[Method] = CreateCallbackDetour(Instance, Callback)\n\t\t\t\tend\n\t\t\tend\n\t\tend\n\tend\n\n\t--[[\n\t\tCreates a hook that intercepts .OnInvoke & .OnClientInvoke assignments and detours them to log the calls.\n\t]]\n\tlocal function SetupCallbackAssignmentHook()\n\t\tlocal NewIndexHookFilter = SupportsFilters and AnyFilter.new(CreateBaseFilter())\n\t\t\n\t\twax.shared.NewIndexHook = wax.shared.Hooking.HookMetaMethod(game, \"__newindex\", function(...)\n\t\t\tlocal self, key, value = ...\n\n\t\t\tif typeof(self) ~= \"Instance\" or not ClassesToHook[self.ClassName] then\n\t\t\t\treturn wax.shared.NewIndexHook(...)\n\t\t\tend\n\n\t\t\tif self.ClassName == \"RemoteFunction\" or self.ClassName == \"BindableFunction\" then\n\t\t\t\tlocal Method = ClassesToHook[self.ClassName]\n\n\t\t\t\tlocal IsCallable = ResolveCallableFunction(value) ~= nil\n\n\t\t\t\tif key == Method and IsCallable then\n\t\t\t\t\tif CallbackOwners[value] then\n\t\t\t\t\t\treturn wax.shared.NewIndexHook(...)\n\t\t\t\t\tend\n\n\t\t\t\t\treturn wax.shared.NewIndexHook(self, key, CreateCallbackDetour(self :: InstancesToHook, value))\n\t\t\t\tend\n\t\t\tend\n\n\t\t\treturn wax.shared.NewIndexHook(...)\n\t\tend, NewIndexHookFilter)\n\tend\n\n\t--[[\n\t\tHandles logging for a connection.\n\n\t\t@param Method The method to log.\n\t\t@param callback The callback to log.\n\t\t@param ... The arguments to log.\n\n\t\t@return The result of the connection.\n\t]]\n\tlocal function HandleConnectionLogging(Instance, Method, callback, ...)\n\t\tlocal Log = wax.shared.Logs.Incoming[wax.shared.GetDebugId(Instance)]\n\n\t\tif Log and Log.Blocked then\n\t\t\tfor _, Connection in getconnections(Instance[Method]) do\n\t\t\t\tif not Connection.ForeignState and Connection.Function ~= callback then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\n\t\t\t\tConnection:Disable()\n\t\t\tend\n\t\tend\n\n\t\treturn ...\n\tend\n\n\t--[[\n\t\tCreates a hook that disables connections for blocked instances on creation.\n\t]]\n\tlocal function SetupConnectionAssignmentHook()\n\t\tlocal SignalMetatable = wax.shared.getrawmetatable(Instance.new(\"Part\").Touched)\n\t\twax.shared.Hooks[SignalMetatable.__index] = wax.shared.Hooking.HookFunction(SignalMetatable.__index, function(...)\n\t\t\tlocal self, key = ...\n\n\t\t\tif not wax.shared.Unloaded and ConnectionKeys[key] then\n\t\t\t\tlocal Instance = SignalMapping[self]\n\t\t\t\tlocal Connect = wax.shared.Hooks[SignalMetatable.__index](...)\n\n\t\t\t\tif not Instance then\n\t\t\t\t\treturn Connect\n\t\t\t\tend\n\n\t\t\t\tlocal Method = ClassesToHook[Instance.ClassName]\n\t\t\t\treturn wax.shared.newcclosure(function(...)\n\t\t\t\t\tlocal _self, callback = ...\n\t\t\t\t\treturn HandleConnectionLogging(Instance, Method, callback, Connect(...))\n\t\t\t\tend, debug.info(Connect, \"n\"))\n\t\t\tend\n\n\t\t\treturn wax.shared.Hooks[SignalMetatable.__index](...)\n\t\tend)\n\tend\n\n\tlocal Started = false\n\twax.shared.IncomingInterceptor = function(Options: Options?)\n\t\tif Started then\n\t\t\treturn\n\t\tend\n\n\t\t--// Validation \\\\--\n\t\tOptions = Options or {}\n\t\tdo\n\t\t\tConnectionsEnabled = Options.Connections ~= false\n\t\t\tCallbacksEnabled = Options.Callbacks ~= false\n\t\t\tConnectionHookEnabled = Options.HookConnections ~= false\n\t\tend\n\n\t\tif not ConnectionsEnabled and not CallbacksEnabled then\n\t\t\treturn\n\t\tend\n\n\t\tStarted = true\n\n\t\t--// Listeners \\\\--\n\t\tif CallbacksEnabled then\n\t\t\tif wax.shared.ExecutorSupport[\"setstackhidden\"].IsWorking then\n\t\t\t\tsetstackhidden(HandleCallbackLogging, true)\n\t\t\tend\n\n\t\t\tSetupCallbackAssignmentHook()\n\t\tend\n\n\t\tif ConnectionsEnabled and ConnectionHookEnabled then\n\t\t\tSetupConnectionAssignmentHook()\n\t\tend\n\n\t\twax.shared.Connect(game.DescendantAdded:Connect(function(instance)\n\t\t\tHandleInstance(cloneref(instance))\n\t\tend))\n\n\t\t--// Initialization \\\\--\n\t\tlocal ClassesToSearch = {}\n\t\tdo\n\t\t\tif ConnectionsEnabled then\n\t\t\t\ttable.insert(ClassesToSearch, \"RemoteEvent\")\n\t\t\t\ttable.insert(ClassesToSearch, \"UnreliableRemoteEvent\")\n\t\t\t\ttable.insert(ClassesToSearch, \"BindableEvent\")\n\t\t\tend\n\t\t\tif CallbacksEnabled then\n\t\t\t\ttable.insert(ClassesToSearch, \"RemoteFunction\")\n\t\t\t\ttable.insert(ClassesToSearch, \"BindableFunction\")\n\t\t\tend\n\t\tend\n\n\t\tlocal Categories = {\n\t\t\tgame:QueryDescendants(table.concat(ClassesToSearch, \", \")),\n\t\t}\n\t\tif wax.shared.ExecutorSupport[\"getnilinstances\"].IsWorking then\n\t\t\ttable.insert(Categories, getnilinstances())\n\t\tend\n\n\t\tfor _, Category in Categories do\n\t\t\tfor _, TargetInstance in next, Category do\n\t\t\t\tHandleInstance(cloneref(TargetInstance))\n\t\t\tend\n\t\tend\n\tend\nend\n--#endregion\n\ntask.spawn(wax.shared.IncomingInterceptor, {\n\tConnections = false,\n\tCallbacks = Data.IncomingCallbacks,\n\tHookConnections = false,\n})\n\nif Data.Outgoing then\n\ttask.spawn(function()\n\t\tlocal function CreateLookupTable(table)\n\t\t\tlocal LookupTable = {}\n\t\t\tfor _, Method in next, table do\n\t\t\t\tLookupTable[Method] = true\n\t\t\tend\n\t\t\treturn LookupTable\n\t\tend\n\n\t\tlocal NamecallMethods = {\n\t\t\t[\"FireServer\"] = CreateLookupTable({\"RemoteEvent\", \"UnreliableRemoteEvent\"}),\n\t\t\t[\"fireServer\"] = CreateLookupTable({\"RemoteEvent\", \"UnreliableRemoteEvent\"}),\n\t\t\t\n\t\t\t[\"InvokeServer\"] = CreateLookupTable({\"RemoteFunction\"}),\n\t\t\t[\"invokeServer\"] = CreateLookupTable({\"RemoteFunction\"}),\n\n\t\t\t[\"Fire\"] = CreateLookupTable({\"BindableEvent\"}),\n\t\t\t[\"fire\"] = CreateLookupTable({\"BindableEvent\"}),\n\t\t\t\n\t\t\t[\"Invoke\"] = CreateLookupTable({\"BindableFunction\"}),\n\t\t\t[\"invoke\"] = CreateLookupTable({\"BindableFunction\"}),\n\t\t}\n\t\tlocal AllowedClassNames =\n\t\t\tCreateLookupTable({ \"RemoteEvent\", \"RemoteFunction\", \"UnreliableRemoteEvent\", \"BindableEvent\", \"BindableFunction\" })\n\n\t\t--[[\n\t\t\tReturns the calling function via `debug.info`\n\n\t\t\t@return `function | nil` The calling function or nil if not found.\n\t\t]]\n\t\tlocal function getcallingfunction()\n\t\t\tlocal BaseLevel = if wax.shared.IsUsingOthHooks then 3 else 5\n\n\t\t\tfor i = BaseLevel, 10 do\n\t\t\t\tlocal Function, Source = debug.info(i, \"fs\")\n\t\t\t\tif not Function or not Source then\n\t\t\t\t\tbreak\n\t\t\t\tend\n\n\t\t\t\tif Source == \"[C]\" then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\n\t\t\t\treturn Function\n\t\t\tend\n\n\t\t\treturn debug.info(BaseLevel, \"f\")\n\t\tend\n\n\t\t--[[\n\t\t\tReturns the calling line of the script that called the function via `debug.info`\n\n\t\t\t@return number Returns the line number of the calling script.\n\t\t]]\n\t\tlocal function getcallingline()\n\t\t\tlocal BaseLevel = if wax.shared.IsUsingOthHooks then 3 else 5\n\n\t\t\tfor i = BaseLevel, 10 do\n\t\t\t\tlocal Source, Line = debug.info(i, \"sl\")\n\t\t\t\tif not Source then\n\t\t\t\t\tbreak\n\t\t\t\tend\n\n\t\t\t\tif Source == \"[C]\" then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\n\t\t\t\treturn Line\n\t\t\tend\n\n\t\t\treturn debug.info(BaseLevel, \"l\")\n\t\tend\n\n\t\t--[[\n\t\t\tReturns the calling source of the script that called the function via `debug.info`\n\n\t\t\t@return string Returns the source of the calling script.\n\t\t]]\n\t\tlocal function getcallingsource()\n\t\t\tlocal BaseLevel = if wax.shared.IsUsingOthHooks then 3 else 5\n\n\t\t\tfor i = BaseLevel, 10 do\n\t\t\t\tlocal Source = debug.info(i, \"s\")\n\t\t\t\tif not Source then\n\t\t\t\t\tbreak\n\t\t\t\tend\n\n\t\t\t\tif Source == \"[C]\" then\n\t\t\t\t\tcontinue\n\t\t\t\tend\n\n\t\t\t\treturn Source\n\t\t\tend\n\n\t\t\treturn debug.info(BaseLevel, \"s\")\n\t\tend\n\n\t\t--[[\n\t\t\tGets the log for a specific instance and direction.\n\n\t\t\t@param Instance: The instance that was called.\n\t\t\t@param Direction: The direction of the log (Outgoing, Incoming).\n\t\t\t@return Log: The log for the instance and direction.\n\t\t]]\n\t\tlocal function GetLog(Instance: Instance, Direction: \"Outgoing\" | \"Incoming\")\n\t\t\tlocal DebugId = wax.shared.GetDebugId(Instance)\n\n\t\t\tlocal LogsInDirection = wax.shared.Logs[Direction]\n\t\t\tif not LogsInDirection then\n\t\t\t\treturn nil\n\t\t\tend\n\n\t\t\tlocal Log = LogsInDirection[DebugId]\n\t\t\tif not Log then\n\t\t\t\tLog = wax.shared.NewLog(Instance, Direction, getcallingscript(), DebugId)\n\t\t\tend\n\n\t\t\treturn Log\n\t\tend\n\n\t\t--[[\n\t\t\tHandles logging for a result of a remote function.\n\t\t\t@param Log The log to use.\n\t\t\t@param Arguments The arguments to use.\n\t\t\t@param ... The result to log.\n\t\t\t@return The result.\n\t\t]]\n\t\tlocal function HandleLoggingResult(Log, Info, ResultKey, ...)\n\t\t\tlocal Result = wax.shared.SafePack.Pack(...)\n\t\t\tInfo[ResultKey] = Result\n\t\t\tLog:Call(Info)\n\n\t\t\treturn ...\n\t\tend\n\n\t\t--[[\n\t\t\tHandles the logging for a specific instance and method.\n\n\t\t\t@param Instance: The instance that was called.\n\t\t\t@param Method: The method that was called (e.g., \"OnClientEvent\").\n\t\t\t@param ... The arguments passed from the server to the client.\n\t\t]]\n\t\tlocal function HandleLogging(TargetInstance: Instance, Method: string, OldFunction: (...any) -> ...any, ...)\n\t\t\tlocal Log = GetLog(TargetInstance, \"Outgoing\")\n\t\t\tif not Log then\n\t\t\t\treturn OldFunction(...)\n\t\t\tend\n\t\t\tlocal Arguments = wax.shared.SafePack.Pack(select(2, ...))\n\n\t\t\tlocal Info = {\n\t\t\t\tArguments = Arguments,\n\t\t\t\tOrigin = getcallingscript(),\n\t\t\t\tFunction = getcallingfunction(),\n\t\t\t\tLine = getcallingline(),\n\t\t\t\tSource = getcallingsource(),\n\t\t\t\tIsExecutor = checkcaller(),\n\t\t\t}\n\t\t\tlocal ShouldBlock = Log:ShouldBlock(Info)\n\t\t\tLog:Call(Info)\n\t\t\tif ShouldBlock then\n\t\t\t\treturn\n\t\t\tend\n\n\t\t\tlocal IsRemoteFunctionInvoke = (\n\t\t\t\tTargetInstance.ClassName == \"RemoteFunction\" and (Method == \"InvokeServer\" or Method == \"invokeServer\")\n\t\t\t)\n\n\t\t\tlocal IsBindableFunctionInvoke = (\n\t\t\t\tTargetInstance.ClassName == \"BindableFunction\" and (Method == \"Invoke\" or Method == \"invoke\")\n\t\t\t)\n\n\t\t\tif IsRemoteFunctionInvoke or IsBindableFunctionInvoke then\n\t\t\t\t--// Handle Incoming Log \\\\--\n\t\t\t\tLog = GetLog(TargetInstance, \"Incoming\")\n\t\t\t\tlocal RFResultInfo = {\n\t\t\t\t\tArguments = Arguments,\n\t\t\t\t\tInvokeResult = nil,\n\t\t\t\t\tOrigin = getcallingscript(),\n\t\t\t\t\tFunction = getcallingfunction(),\n\t\t\t\t\tLine = getcallingline(),\n\t\t\t\t\tSource = getcallingsource(),\n\t\t\t\t\tIsExecutor = checkcaller(),\n\t\t\t\t\tInvokeKind = \"Request\",\n\t\t\t\t}\n\n\t\t\t\tif Log:ShouldBlock(RFResultInfo) then\n\t\t\t\t\tLog:Call(RFResultInfo)\n\t\t\t\t\treturn\n\t\t\t\tend\n\n\t\t\t\treturn HandleLoggingResult(Log, RFResultInfo, \"InvokeResult\", OldFunction(...))\n\t\t\tend\n\n\t\t\treturn OldFunction(...)\n\t\tend\n\n\t\t--#region Hook Filters\n\t\tlocal SupportsFilters = wax.shared.ExecutorSupport[\"FilterBase\"].IsWorking\n\n\t\t--[[\n\t\t\tCreates a base filter for the outgoing hooks.\n\n\t\t\t@return `table` The base filter.\n\t\t]]\n\t\tlocal function CreateBaseFilter()\n\t\t\tlocal Filters = {}\n\t\t\tif not SupportsFilters then\n\t\t\t\treturn Filters\n\t\t\tend\n\n\t\t\t--// ignore communicator \\\\--\n\t\t\ttable.insert(Filters, NotFilter.new(ArgumentFilter.new(1, wax.shared.Communicator)))\n\t\t\ttable.insert(Filters, NotFilter.new(ArgumentFilter.new(1, wax.shared.ActorCommunicator)))\n\n\t\t\treturn Filters\n\t\tend\n\n\t\tlocal NamecallHookFilter = SupportsFilters and AllFilter.new((function()\n\t\t\tlocal Filters = CreateBaseFilter()\n\n\t\t\t--[[\n\t\t\t\tAllFilter:\n\t\t\t\t\tnot communicator\n\t\t\t\t\tnot actor communicator\n\t\t\t\t\tAnyFilter:\n\t\t\t\t\t\tRemoteEvent\n\t\t\t\t\t\t...\n\t\t\t\t\tAnyFilter:\n\t\t\t\t\t\tFireServer\n\t\t\t\t\t\tinvokeServer\n\t\t\t\t\t\t...\n\t\t\t--]]\n\n\t\t\t--// classnames \\\\--\n\t\t\tlocal AnyClassNameFilters = {}\n\t\t\tfor ClassName in AllowedClassNames do\n\t\t\t\ttable.insert(AnyClassNameFilters, InstanceTypeFilter.new(1, ClassName))\n\t\t\tend\n\t\t\t\n\t\t\t--// methods \\\\--\n\t\t\tlocal AnyNamecallMethoFilters = {}\n\t\t    for Method in NamecallMethods do\n\t\t        table.insert(AnyNamecallMethoFilters, NamecallFilter.new(Method))\n\t\t    end\n\n\t\t\ttable.insert(Filters, AnyFilter.new(AnyClassNameFilters))\n\t\t\ttable.insert(Filters, AnyFilter.new(AnyNamecallMethoFilters))\n\t\t    return Filters\n\t\tend)())\n\t\t--#endregion\n\n\t\t-- namecall hook\n\t\twax.shared.NamecallHook = wax.shared.Hooking.HookMetaMethod(game, \"__namecall\", function(...)\n\t\t\tlocal self = ...\n\t\t\tlocal Method = getnamecallmethod()\n\n\t\t\tif\n\t\t\t\ttypeof(self) == \"Instance\"\n\t\t\t\tand AllowedClassNames[self.ClassName]\n\t\t\t\tand not rawequal(self, wax.shared.Communicator)\n\t\t\t\tand not rawequal(self, wax.shared.ActorCommunicator)\n\t\t\t\tand (NamecallMethods[Method] and NamecallMethods[Method][self.ClassName])\n\t\t\t\tand not wax.shared.ShouldIgnore(self, getcallingscript())\n\t\t\tthen\n\t\t\t\treturn HandleLogging(cloneref(self), Method, wax.shared.NamecallHook, ...)\n\t\t\tend\n\n\t\t\treturn wax.shared.NamecallHook(...)\n\t\tend, NamecallHookFilter)\n\n\t\t-- function hooks\n\t\tlocal FunctionsToHook\n\t\tdo\n\t\t\tlocal BindableFunction = Instance.new(\"BindableFunction\")\n\t\t\tlocal BindableEvent = Instance.new(\"BindableEvent\")\n\n\t\t\tlocal RemoteFunction = Instance.new(\"RemoteFunction\")\n\t\t\tlocal RemoteEvent = Instance.new(\"RemoteEvent\")\n\t\t\tlocal UnreliableRemoteEvent = Instance.new(\"UnreliableRemoteEvent\")\n\n\t\t\tFunctionsToHook = {\n\t\t\t\tBindableFunction.Invoke,\n\t\t\t\tBindableEvent.Fire,\n\n\t\t\t\tRemoteFunction.InvokeServer,\n\t\t\t\tRemoteEvent.FireServer,\n\t\t\t\tUnreliableRemoteEvent.FireServer,\n\t\t\t}\n\n\t\t\tBindableFunction:Destroy()\n\t\t\tBindableEvent:Destroy()\n\n\t\t\tRemoteFunction:Destroy()\n\t\t\tRemoteEvent:Destroy()\n\t\t\tUnreliableRemoteEvent:Destroy()\n\t\tend\n\n\t\tlocal FunctionHookFilter = SupportsFilters and AllFilter.new((function()\n\t\t\tlocal Filters = CreateBaseFilter()\n\n\t\t\t--[[\n\t\t\t\tAllFilter:\n\t\t\t\t\tnot communicator\n\t\t\t\t\tnot actor communicator\n\t\t\t\t\tAnyFilter:\n\t\t\t\t\t\tRemoteEvent\n\t\t\t\t\t\tRemoteFunction\n\t\t\t\t\t\tUnreliableRemoteEvent\n\t\t\t\t\t\tBindableEvent\n\t\t\t\t\t\tBindableFunction\n\t\t\t--]]\n\n\t\t\tlocal ClassFilters = {}\n\t\t\tfor ClassName in AllowedClassNames do\n\t\t\t\ttable.insert(ClassFilters, InstanceTypeFilter.new(1, ClassName))\n\t\t\tend\n\n\t\t\ttable.insert(Filters, AnyFilter.new(ClassFilters))\n\t\t\treturn Filters\n\t\tend)())\n\n\t\tfor _, Function in next, FunctionsToHook do\n\t\t\tlocal Method = debug.info(Function, \"n\")\n\n\t\t\twax.shared.Hooks[Function] = wax.shared.Hooking.HookFunction(Function, function(...)\n\t\t\t\tlocal self = ...\n\n\t\t\t\tif\n\t\t\t\t\ttypeof(self) == \"Instance\"\n\t\t\t\t\tand AllowedClassNames[self.ClassName]\n\t\t\t\t\tand not rawequal(self, wax.shared.Communicator)\n\t\t\t\t\tand not wax.shared.ShouldIgnore(self, getcallingscript())\n\t\t\t\tthen\n\t\t\t\t\treturn HandleLogging(cloneref(self), Method, wax.shared.Hooks[Function], ...)\n\t\t\t\tend\n\n\t\t\t\treturn wax.shared.Hooks[Function](...)\n\t\t\tend, FunctionHookFilter)\n\t\tend\n\tend)\nend\n\ntask.spawn(function()\n\tlocal getrawmetatable = getrawmetatable or debug.getmetatable\n\n\twax.shared.Communicator.Event:Connect(function(Type, ...)\n\t\tif Type ~= \"Unload\" then\n\t\t\treturn\n\t\tend\n\n\t\tlocal gameMetatable = getrawmetatable(game)\n\n\t\tif wax.shared.ExecutorSupport[\"oth\"].IsWorking then\n\t\t\tif Data.Outgoing then\n\t\t\t\tpcall(oth.unhook, gameMetatable.__namecall)\n\t\t\tend\n\t\t\tif Data.IncomingCallbacks then\n\t\t\t\tpcall(oth.unhook, gameMetatable.__newindex)\n\t\t\tend\n\t\telse\n\t\t\tif wax.shared.ExecutorSupport[\"restorefunction\"].IsWorking and wax.shared.ExecutorSupport[\"hookmetamethod\"].IsWorking then\n\t\t\t\tif Data.Outgoing then\n\t\t\t\t\tpcall(restorefunction, gameMetatable.__namecall)\n\t\t\t\tend\n\t\t\t\tif Data.IncomingCallbacks then\n\t\t\t\t\tpcall(restorefunction, gameMetatable.__newindex)\n\t\t\t\tend\n\t\t\telse\n\t\t\t\tif Data.Outgoing then\n\t\t\t\t\twax.shared.Hooking.HookMetaMethod(game, \"__namecall\", wax.shared.NamecallHook)\n\t\t\t\tend\n\t\t\t\tif Data.IncomingCallbacks then\n\t\t\t\t\twax.shared.Hooking.HookMetaMethod(game, \"__newindex\", wax.shared.NewIndexHook)\n\t\t\t\tend\n\t\t\t\tend\n\t\t\tend\n\n\t\t\tif Data.IncomingCallbacks and wax.shared.RestoreCallbackDetours then\n\t\t\t\twax.shared.RestoreCallbackDetours()\n\t\t\tend\n\n\t\t\tfor Function, Original in pairs(wax.shared.Hooks) do\n\t\t\tif wax.shared.ExecutorSupport[\"oth\"].IsWorking then\n\t\t\t\ttask.spawn(pcall, oth.unhook, Function)\n\t\t\telseif wax.shared.ExecutorSupport[\"restorefunction\"].IsWorking then\n\t\t\t\ttask.spawn(pcall, wax.shared.restorefunction, Function)\n\t\t\telse\n\t\t\t\tpcall(wax.shared.Hooking.HookFunction, Function, Original)\n\t\t\tend\n\t\tend\n\n\t\ttask.defer(function()\n\t\t\tgetgenv().RobloxPLInitialized = false\n\t\tend)\n\tend)\nend)\n"
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    "ExecutorSupport"
                 }
             }
         }
@@ -25023,162 +25182,162 @@ local LineOffsets = {
     534,
     1170,
     [5] = 1198,
-    [9] = 1576,
+    [9] = 1585,
     [10] = 2239,
-    [11] = 2579,
-    [12] = 2609,
-    [14] = 2632,
-    [15] = 2749,
-    [16] = 2861,
-    [17] = 2960,
-    [20] = 3231,
-    [22] = 3300,
-    [24] = 3379,
-    [25] = 3575,
-    [26] = 4017,
-    [27] = 4139,
-    [29] = 4237,
-    [30] = 4365,
-    [31] = 4468,
-    [32] = 4794,
-    [34] = 5129,
-    [35] = 5424,
-    [36] = 6450,
-    [38] = 6679,
-    [39] = 6700,
-    [40] = 6726,
-    [41] = 6869,
-    [43] = 6920,
-    [44] = 6970,
-    [45] = 6995,
-    [46] = 7258,
-    [48] = 7418,
-    [50] = 7504,
-    [51] = 7724,
-    [52] = 8377,
-    [55] = 8463,
-    [56] = 8535,
-    [57] = 8564,
-    [58] = 8580,
-    [59] = 8597,
-    [60] = 8623,
-    [61] = 8646,
-    [62] = 8685,
-    [63] = 8745,
-    [64] = 8848,
-    [65] = 8867,
-    [66] = 8915,
-    [67] = 8973,
-    [68] = 9005,
-    [69] = 9092,
-    [70] = 9126,
-    [71] = 9145,
-    [72] = 9207,
-    [73] = 9225,
-    [74] = 9283,
-    [75] = 9320,
-    [76] = 9343,
-    [77] = 9378,
-    [78] = 9428,
-    [79] = 9450,
-    [80] = 9470,
-    [81] = 9515,
-    [82] = 9574,
-    [83] = 9671,
-    [84] = 9687,
-    [85] = 9710,
-    [86] = 9750,
-    [87] = 9768,
-    [88] = 9788,
-    [89] = 9804,
-    [90] = 9823,
-    [91] = 9882,
-    [92] = 10063,
-    [93] = 10131,
-    [94] = 10687,
-    [95] = 10724,
-    [98] = 10897,
-    [99] = 10942,
-    [100] = 11044,
-    [101] = 11455,
-    [102] = 11479,
-    [103] = 11568,
-    [104] = 11612,
-    [105] = 11654,
-    [106] = 11679,
-    [107] = 11726,
-    [108] = 11756,
-    [109] = 11917,
-    [110] = 11953,
-    [111] = 12075,
-    [112] = 12084,
-    [113] = 12323,
-    [114] = 12391,
-    [117] = 12482,
-    [118] = 12533,
-    [119] = 12931,
-    [120] = 13028,
-    [121] = 13147,
-    [122] = 13176,
-    [123] = 13498,
-    [125] = 13705,
-    [126] = 14065,
-    [127] = 14695,
-    [128] = 14703,
-    [129] = 14825,
-    [130] = 14855,
-    [131] = 14881,
-    [132] = 14907,
-    [133] = 14940,
-    [134] = 14968,
-    [135] = 15014,
-    [136] = 15057,
-    [139] = 15220,
-    [140] = 15508,
-    [141] = 15637,
-    [142] = 15920,
-    [143] = 16154,
-    [144] = 16184,
-    [145] = 16353,
-    [146] = 16505,
-    [147] = 16564,
-    [148] = 16584,
-    [149] = 17809,
-    [150] = 18180,
-    [151] = 18395,
-    [153] = 18413,
-    [155] = 18600,
-    [156] = 18762,
-    [157] = 18843,
-    [158] = 19139,
-    [159] = 19181,
-    [160] = 19660,
-    [161] = 19977,
-    [162] = 20441,
-    [163] = 20894,
-    [165] = 21154,
-    [166] = 21271,
-    [168] = 21303,
-    [169] = 21398,
-    [170] = 21427,
-    [171] = 21743,
-    [173] = 21824,
-    [174] = 22079,
-    [175] = 22133,
-    [177] = 22184,
-    [179] = 22377,
-    [180] = 23263,
-    [181] = 23337
+    [11] = 2571,
+    [12] = 2601,
+    [14] = 2624,
+    [15] = 2741,
+    [16] = 2853,
+    [17] = 2952,
+    [20] = 3223,
+    [22] = 3292,
+    [24] = 3371,
+    [25] = 3567,
+    [26] = 4009,
+    [27] = 4131,
+    [29] = 4229,
+    [30] = 4357,
+    [31] = 4460,
+    [32] = 4786,
+    [34] = 5121,
+    [35] = 5416,
+    [36] = 6442,
+    [38] = 6671,
+    [39] = 6692,
+    [40] = 6718,
+    [41] = 6861,
+    [43] = 6912,
+    [44] = 6962,
+    [45] = 6987,
+    [46] = 7250,
+    [48] = 7410,
+    [50] = 7496,
+    [51] = 7716,
+    [52] = 8369,
+    [55] = 8455,
+    [56] = 8527,
+    [57] = 8556,
+    [58] = 8572,
+    [59] = 8589,
+    [60] = 8615,
+    [61] = 8638,
+    [62] = 8677,
+    [63] = 8737,
+    [64] = 8840,
+    [65] = 8859,
+    [66] = 8907,
+    [67] = 8965,
+    [68] = 8997,
+    [69] = 9084,
+    [70] = 9118,
+    [71] = 9137,
+    [72] = 9199,
+    [73] = 9217,
+    [74] = 9275,
+    [75] = 9312,
+    [76] = 9335,
+    [77] = 9370,
+    [78] = 9420,
+    [79] = 9442,
+    [80] = 9462,
+    [81] = 9507,
+    [82] = 9566,
+    [83] = 9663,
+    [84] = 9679,
+    [85] = 9702,
+    [86] = 9742,
+    [87] = 9760,
+    [88] = 9780,
+    [89] = 9796,
+    [90] = 9815,
+    [91] = 9874,
+    [92] = 10055,
+    [93] = 10123,
+    [94] = 10679,
+    [95] = 10716,
+    [98] = 10889,
+    [99] = 10934,
+    [100] = 11036,
+    [101] = 11447,
+    [102] = 11471,
+    [103] = 11560,
+    [104] = 11604,
+    [105] = 11646,
+    [106] = 11671,
+    [107] = 11718,
+    [108] = 11748,
+    [109] = 11909,
+    [110] = 11945,
+    [111] = 12067,
+    [112] = 12076,
+    [113] = 12315,
+    [114] = 12383,
+    [117] = 12474,
+    [118] = 12653,
+    [119] = 13070,
+    [120] = 13167,
+    [121] = 13333,
+    [122] = 13362,
+    [123] = 13684,
+    [125] = 13891,
+    [126] = 14232,
+    [127] = 14851,
+    [128] = 14859,
+    [129] = 14981,
+    [130] = 15011,
+    [131] = 15037,
+    [132] = 15063,
+    [133] = 15096,
+    [134] = 15124,
+    [135] = 15170,
+    [136] = 15213,
+    [139] = 15373,
+    [140] = 15654,
+    [141] = 15783,
+    [142] = 16054,
+    [143] = 16293,
+    [144] = 16323,
+    [145] = 16492,
+    [146] = 16644,
+    [147] = 16703,
+    [148] = 16723,
+    [149] = 17942,
+    [150] = 18310,
+    [151] = 18539,
+    [153] = 18557,
+    [155] = 18744,
+    [156] = 18906,
+    [157] = 18987,
+    [158] = 19283,
+    [159] = 19325,
+    [160] = 19804,
+    [161] = 20121,
+    [162] = 20585,
+    [163] = 21038,
+    [165] = 21298,
+    [166] = 21415,
+    [168] = 21447,
+    [169] = 21542,
+    [170] = 21571,
+    [171] = 21887,
+    [173] = 21968,
+    [174] = 22223,
+    [175] = 22277,
+    [177] = 22328,
+    [179] = 22521,
+    [180] = 23407,
+    [181] = 23481
 }
 
 -- Luau aliases from .luaurc
 local Aliases = {
-    src = "/RobloxPL"
+    src = "/cobalt"
 }
 
 -- Misc AOT variable imports
 local WaxVersion = "0.4.1"
-local EnvName = "RobloxPL"
+local EnvName = "Cobalt"
 
 -- ++++++++ RUNTIME IMPL BELOW ++++++++ --
 
@@ -25230,6 +25389,25 @@ local ScriptsToRun = {}
 
 -- wax.shared __index/__newindex
 local SharedEnvironment = {}
+
+-- Global helper injected into every script closure
+-- Array entries become [value] = true, dictionary entries are kept as-is, non-tables pass through
+local function CreateLookupTable(Values)
+    if type(Values) ~= "table" then
+        return Values
+    end
+
+    local LookupTable = {}
+    for Key, Value in next, Values do
+        if type(Key) == "number" then
+            LookupTable[Value] = true
+        else
+            LookupTable[Key] = Value
+        end
+    end
+
+    return LookupTable
+end
 
 -- We're creating 'fake' instance refs soley for traversal of the DOM for require() compatibility
 -- It's meant to be as lazy as possible
@@ -25688,7 +25866,7 @@ function ImportGlobals(refId)
     end
 
     -- Now, return flattened globals ready for direct runtime exec
-    return Global_wax, Global_script, Global_require
+    return Global_wax, Global_script, Global_require, CreateLookupTable
 end
 
 for _, ScriptRef in next, ScriptsToRun do
